@@ -8,6 +8,7 @@ from time import sleep
 from params import train_params
 from utils.network import Actor, Critic
 from utils.l2_projection import _l2_project
+from utils.visdom_utils import VisdomLinePlotter
 
 
 class Learner:
@@ -34,6 +35,8 @@ class Learner:
                                   train_params.V_MIN,
                                   train_params.V_MAX)
 
+        self.plotter = VisdomLinePlotter(env_name='Reward')
+
     def run(self):
         """
         Sample batches of experiences from replay memory and train learner networks
@@ -58,7 +61,7 @@ class Learner:
 
             states_batch = minibatch[0]
             actions_batch = minibatch[1]
-            rewards_batch = minibatch[2]  # [batch_size x 1]
+            rewards_batch = minibatch[2]
             next_states_batch = minibatch[3]
             terminals_batch = minibatch[4]
             gammas_batch = minibatch[5]
@@ -90,7 +93,7 @@ class Learner:
                                           train_params.NUM_ATOMS)
 
             criterion = nn.BCELoss(reduction='none')
-            optimizer = torch.optim.Adam(self.critic.parameters(), lr=0.001)
+            optimizer = torch.optim.Adam(self.critic.parameters(), lr=0.0001)
 
             target_Z_projected = _l2_project(target_Z_atoms,
                                              target_Z_dist,
@@ -136,7 +139,7 @@ class Learner:
             actor_loss = -self.critic(states_batch, actions_pred).mean()
 
             # Compute gradients of critic's value output distribution wrt actions
-            optimizer_actor = torch.optim.Adam(self.actor.parameters(), 0.001)
+            optimizer_actor = torch.optim.Adam(self.actor.parameters(), 0.0001)
             optimizer_actor.zero_grad()
             actor_loss.backward()
 

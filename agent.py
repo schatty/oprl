@@ -10,7 +10,7 @@ import imageio
 from params import train_params
 from utils.network import Actor
 from utils.env_wrapper import PendulumWrapper
-
+from utils.visdom_utils import VisdomLinePlotter
 
 class Agent:
 
@@ -29,6 +29,8 @@ class Agent:
                                train_params.ACTION_DIMS,
                                train_params.ACTION_BOUND_LOW,
                                train_params.ACTION_BOUND_HIGH)
+        self.plotter = VisdomLinePlotter()
+
 
     def update_actor_learner(self):
         target = self.actor_learner
@@ -102,6 +104,9 @@ class Agent:
                 state = next_state
 
                 if terminal or num_steps == train_params.MAX_EP_LENGTH:
+
+                    self.plotter.plot('reward', 'train', 'Agent Reward', num_eps, episode_reward)
+
                     # Compute Bellman rewards and add experiences to replay memory
                     # for the last N-1 experiences still remaining
                     while len(self.exp_buffer) != 0:

@@ -26,7 +26,7 @@ def train():
     learner = Learner(per_memory)
     threads.append(threading.Thread(target=learner.run))
 
-    for n_agent in range(1):
+    for n_agent in range(4):
         print("N_AGENT: ", n_agent)
         # Initialize agent
         agent = Agent(env=train_params.ENV, actor_learner=learner.actor, n_agent=n_agent)
