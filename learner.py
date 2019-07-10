@@ -65,30 +65,17 @@ class Learner:
             weights_batch = minibatch[6]
             idx_batch = minibatch[7]
 
-            print("States: ", states_batch.shape)
-            print("Actions: ", actions_batch.shape)
-            print("Rewards; ", rewards_batch.shape)
-            print("Next state batch: ", next_states_batch.shape)
-            print("Terminals batch: ", terminals_batch.shape)
-            print("Gammas batch: ", gammas_batch.shape)
-            print("Weights batch: ", weights_batch.shape)
-            print("idx_batch: ", idx_batch)
-
             # ------------- Critic training step -----------
 
-            print("Critic training step")
             # Predict actions for next  states by passing next states through policy target network
             next_states_batch = torch.tensor(next_states_batch)
-            print("next_states_batch: ", type(next_states_batch), next_states_batch.shape)
             future_actions = self.actor_target(next_states_batch)
-            print("future_actions: ", type(future_actions), future_actions.shape)
 
             # Predict future Z distribution by passing next states and actions through value target network
             target_Z_dist = self.critic_target(next_states_batch, future_actions)
             target_Z_atoms = self.critic_target.z_atoms
 
             # Create batch of target network's Z-atoms
-            #target_Z_atoms = target_Z_atoms.numpy().reshape((-1, 1))
             target_Z_atoms = np.repeat(np.expand_dims(target_Z_atoms, axis=0), train_params.BATCH_SIZE, axis=0) # [batch_size x n_atoms]
 
             # Value of terminal states is 0 by definition
@@ -96,21 +83,14 @@ class Learner:
 
             gammas_batch = gammas_batch.reshape((-1, 1)) # [batch_size x 1]
 
-            print("expanded rewards: ", rewards_batch.shape)
-            print("target_Z_atoms: ", target_Z_atoms.shape)
-            print("gammas expanded: ", gammas_batch.shape)
-
             target_Z_atoms = rewards_batch + (target_Z_atoms * gammas_batch)
-            print("target_Z_atoms final: ", target_Z_atoms.shape)
 
             self.z_atoms = torch.linspace(train_params.V_MIN,
                                           train_params.V_MAX,
                                           train_params.NUM_ATOMS)
 
-            criterion = nn.BCELoss()#nn.CrossEntropyLoss()
+            criterion = nn.BCELoss(reduction='none')
             optimizer = torch.optim.Adam(self.critic.parameters(), lr=0.001)
-
-            print("Types: ", type(target_Z_atoms), type(target_Z_dist), type(self.z_atoms))
 
             target_Z_projected = _l2_project(target_Z_atoms,
                                              target_Z_dist,
@@ -118,18 +98,51 @@ class Learner:
 
             t = torch.autograd.Variable(target_Z_projected, requires_grad=False)
 
-            loss = criterion(target_Z_dist, t)#target_Z_projected)
-            #loss = criterion(target_Z_projected, target_Z_dist)
+            states_batch = torch.tensor(states_batch).float()
+            actions_batch = torch.tensor(actions_batch).float()
+            actions_batch = actions_batch.squeeze(-1)
+            critic_out = self.critic(states_batch, actions_batch)
+            loss = criterion(critic_out, t)
 
-            print("loss: ", loss.shape)
+            TD_error = torch.sum(loss, 1) # [batch_size x 1]
+            TD_error *= torch.tensor(weights_batch).float()
+
+            loss_final = torch.mean(loss)
 
             optimizer.zero_grad()
-            loss.backward()
+            loss_final.backward()
             optimizer.step()
 
-            # td_error [batch_size x 1]
+            # Use critic TD errors to update sample priorities
+            td_error_np = TD_error.detach().numpy()
+            self.per_memory.update_priorities(idx_batch, (np.abs(td_error_np) + train_params.PRIORITY_EPSILON))
 
             # ------------- Actor training step ------------
+
+            # Get policy network's action outputs for selected states
+            states_batch = torch.tensor(states_batch)
+            actor_actions = self.actor(states_batch)
+
+            # Gradient of mean of output Z-distribution wrt action input
+            # used to train actor network, weighing the grads by z_values
+            # given the mean across the output distribution
+            critic_output = self.critic(states_batch, actor_actions)
+            action_grads = torch.zeros(critic_output.shape)
+            torch.autograd.grad(critic_output, actor_actions, action_grads)
+            action_grads *= self.z_atoms
+
+            # Train actor
+            actions_pred = self.actor(states_batch)
+            actor_loss = -self.critic(states_batch, actions_pred).mean()
+
+            # Compute gradients of critic's value output distribution wrt actions
+            optimizer_actor = torch.optim.Adam(self.actor.parameters(), 0.001)
+            optimizer_actor.zero_grad()
+            actor_loss.backward()
+
+            # Update target networks
+            self.soft_update(self.critic, self.critic_target, train_params.TAU)
+            self.soft_update(self.actor, self.actor_target, train_params.TAU)
 
             # Increment beta value at end of every step
             priority_beta += beta_increment
@@ -140,9 +153,14 @@ class Learner:
                     samples_to_remove = len(self.per_memory) - train_params.REPLAY_MEM_SIZE
                     self.per_memory.remove(samples_to_remove)
 
-            break
+    def soft_update(self, local_model, target_model, tau):
+        """Soft update model parameters.
+        theta_target = tau * theta_local * (1 - tau) * theta_target
 
-def soft_update(target, source, tau):
-    for target_p, source_p in zip(target.parameters(), source.parameters()):
-        target_p.data.copy_(target_p.data * (1.0 - tau)  + source_p.data * tau)
-
+        Params:
+            local_model: PyTorch model (weights will be copied from)
+            target_model: PyTorch model (weights will be copied to)
+            tau (float): interpolation parameter
+        """
+        for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
+            target_param.data.copy_(tau * local_param.data + (1.0 - tau) * target_param.data)

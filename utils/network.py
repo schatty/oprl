@@ -13,7 +13,6 @@ def hidden_init(layer):
     return (-lim, lim)
 
 
-
 class Actor(nn.Module):
     """Actor (Policy) Model. """
 
@@ -33,8 +32,8 @@ class Actor(nn.Module):
         state_size = state_size[0]
         action_size = action_size[0]
 
-        self.action_bound_low = action_bound_low
-        self.action_bound_high = action_bound_high
+        self.action_bound_low = float(action_bound_low)
+        self.action_bound_high = float(action_bound_high)
 
         self.fc1 = nn.Linear(state_size, fc1_units)
         self.bn1 = nn.BatchNorm1d(fc1_units)
@@ -52,7 +51,11 @@ class Actor(nn.Module):
         """Build an actor (policy) network that maps states -> actions. """
         x = F.relu(self.fc1(state))
         x = F.relu(self.fc2(x))
-        return F.tanh(self.fc3(x))
+        x = F.tanh(self.fc3(x))
+
+        # Scale tanh output to lower and upper action bounds
+        x = 0.5 * (x * (self.action_bound_high - self.action_bound_low) + (self.action_bound_high+self.action_bound_low))
+        return x
 
 
 class Critic(nn.Module):
@@ -98,12 +101,5 @@ class Critic(nn.Module):
         x = self.fc3(x)
 
         output_probs = F.softmax(x)
-
-        # Q-value is mean of the Z-distribution
-        Q_val = torch.sum(self.z_atoms * output_probs)
-
-        # Project the target distribution onto the bounds of the original network
-        #target_Z_projected = _l2_project(target_Z_atoms, target_Z_dist, self.z_atoms)
-        #target_Z_projected = np.array(target_Z_projected)
 
         return output_probs
