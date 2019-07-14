@@ -81,7 +81,10 @@ class Learner:
             # Create batch of target network's Z-atoms
             target_Z_atoms = np.repeat(np.expand_dims(target_Z_atoms, axis=0), train_params.BATCH_SIZE, axis=0) # [batch_size x n_atoms]
 
-            # Value of terminal states is 0 by definition
+            print("Terminals batch: ", terminals_batch)
+            print(terminals_batch.shape)
+
+            # Value of terminal (done is true) states is 0 by definition
             target_Z_atoms[terminals_batch, :] = 0.0
 
             gammas_batch = gammas_batch.reshape((-1, 1)) # [batch_size x 1]
