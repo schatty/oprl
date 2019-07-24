@@ -229,5 +229,5 @@ if __name__ == "__main__":
 
         rewards.append(episode_reward)
 
-    plt.savefig('reward_d4pg.png')
+    plt.savefig('reward_ddpg.png')
 

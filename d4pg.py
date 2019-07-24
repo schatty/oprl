@@ -148,9 +148,7 @@ class ValueNetwork(nn.Module):
         x = F.relu(self.linear1(x))
         x = F.relu(self.linear2(x))
         x = self.linear3(x)
-
-        output_probs = F.softmax(x)
-        return output_probs
+        return x
 
     def get_probs(self, state, action):
         return F.softmax(self.forward(state, action))
@@ -171,6 +169,9 @@ class PolicyNetwork(nn.Module):
         x = F.relu(self.linear1(state))
         x = F.relu(self.linear2(x))
         x = F.tanh(self.linear3(x))
+
+        x = 0.5 * x * (2 - (-2))
+
         return x
 
     def get_action(self, state):
@@ -201,7 +202,12 @@ def ddpg_update(replay_buffer, batch_size, gamma=0.99, min_value=-np.inf, max_va
     target_Z_atoms = np.repeat(np.expand_dims(target_z_atoms, axis=0), 256,
                                axis=0)  # [batch_size x n_atoms]
     # Value of terminal states is 0 by definition
-    target_Z_atoms[done.cpu().int().numpy(), :] = 0.0
+    #print("Dones rist: ", done.cpu().int().numpy()[:10])
+    #print("Before: ", target_Z_atoms)
+    target_Z_atoms *= (done.cpu().int().numpy() == 0)
+    #print("done: ", done.cpu().int().numpy())
+    #print("After: ", target_Z_atoms)
+    #print()
 
     # Apply bellman update to each atom (expected value)
     reward = reward.cpu().float().numpy()
@@ -269,8 +275,8 @@ if __name__ == "__main__":
     for target_param, param in zip(target_policy_net.parameters(), policy_net.parameters()):
         target_param.data.copy_(param.data)
 
-    value_lr = 1e-4
-    policy_lr = 1e-4
+    value_lr = 5e-4
+    policy_lr = 5e-4
 
     value_optimizer = optim.Adam(value_net.parameters(), lr=value_lr)
     policy_optimizer = optim.Adam(policy_net.parameters(), lr=policy_lr)
