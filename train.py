@@ -1,45 +1,59 @@
 import random
-import threading
-import numpy as np
+from multiprocessing import set_start_method
+import torch.multiprocessing as torch_mp
+try:
+    set_start_method('spawn')
+except RuntimeError:
+    pass
 
+from models.utils import create_learner
+from models.agent import Agent
 from params import train_params
-from utils.prioritised_experience_replay import PrioritizedReplayBuffer
-from utils.gaussian_noise import GaussianNoiseGenerator
-from learner import Learner
-from agent import Agent
+
+
+def sampler_worker(replay_queue, batch_queue, stop_agent_event, batch_size):
+    replay_buffer = []
+    while not stop_agent_event.value or not replay_queue.empty():
+        if not replay_queue.empty():
+            replay = replay_queue.get()
+            replay_buffer.append(replay)
+
+        if len(replay_buffer) < batch_size:
+            continue
+
+        idxes = [random.randint(0, len(replay_buffer) - 1) for _ in range(batch_size)]
+        elems = [replay_buffer[i] for i in idxes]
+        batch_queue.put(elems)
+
+    print("Stop sampler worker.")
 
 
 def train():
-    # Prioritised experience replay memory
-    per_memory = PrioritizedReplayBuffer(train_params.REPLAY_MEM_SIZE, train_params.PRIORITY_ALPHA)
+    config = {'model': 'd4pg', 'environment': 'Pendulum-v0'}
+    batch_size = train_params.BATCH_SIZE
 
-    # Initialize Gaussian noise generator
-    gaussian_noise = GaussianNoiseGenerator(train_params.ACTION_DIMS, train_params.ACTION_BOUND_LOW, train_params.ACTION_BOUND_HIGH, train_params.NOISE_SCALE)
+    processes = []
+    replay_queue = torch_mp.Queue(maxsize=64)
+    stop_agent_event = torch_mp.Value('i', 0)
 
-    # Create threads for learner process and agent process
-    threads = []
+    batch_queue = torch_mp.Queue(maxsize=64)
+    p = torch_mp.Process(target=sampler_worker, args=(replay_queue, batch_queue, stop_agent_event, batch_size))
+    processes.append(p)
 
-    # Create threading event for communication and synchronisation between the learner and agent threads
-    run_agent_event = threading.Event()
-    stop_agent_event = threading.Event()
+    learner = create_learner(config, batch_queue)
+    p = torch_mp.Process(target=learner.run, args=(stop_agent_event,))
+    processes.append(p)
 
-    learner = Learner(per_memory)
-    threads.append(threading.Thread(target=learner.run))
+    agent = Agent(config, actor_learner=learner.target_policy_net)
+    p = torch_mp.Process(target=agent.run, args=(replay_queue, stop_agent_event))
+    processes.append(p)
 
-    for n_agent in range(4):
-        print("N_AGENT: ", n_agent)
-        # Initialize agent
-        agent = Agent(env=train_params.ENV, actor_learner=learner.actor, n_agent=n_agent)
-        print("Agent builded.")
+    for p in processes:
+        p.start()
 
-        threads.append(threading.Thread(target=agent.run,
-                                        args=(per_memory, gaussian_noise, run_agent_event, stop_agent_event)))
-
-    for t in threads:
-        t.start()
-
-    for t in threads:
-        t.join()
+    for p in processes:
+        p.join()
+    print("End.")
 
 
 if __name__ == "__main__":
