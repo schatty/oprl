@@ -1,3 +1,4 @@
+from collections import deque
 import gym
 import matplotlib.pyplot as plt
 
@@ -16,11 +17,13 @@ def plot(frame_idx, rewards):
 
 class Agent:
 
-    def __init__(self, config, actor_learner, n_agent=0):
+    def __init__(self, config, actor_learner, global_episode, n_agent=0):
         print(f"Initializing agent {n_agent}...")
         self.config = config
         self.n_agent = n_agent
         self.max_steps = train_params.MAX_EP_LENGTH
+        self.global_episode = global_episode
+        self.local_episode = 0
 
         # Create environment
         env = config["environment"]
@@ -44,17 +47,19 @@ class Agent:
             target_param.data.copy_(param.data)
 
     def run(self, replay_queue, stop_agent_event):
-        state = self.env_wrapper.reset()
-        self.ou_noise.reset()
+        # Initialise deque buffer to store experiences for N-step returns
+        self.exp_buffer = deque()
 
-        num_episode = 0
         rewards = []
         while not stop_agent_event.value:
             episode_reward = 0
-            num_episode += 1
-            if num_episode % 25 == 0:
-                print("Episode: ", num_episode)
-            if num_episode >= train_params.NUM_STEPS_TRAIN:
+            self.local_episode += 1
+            self.global_episode.value += 1
+            self.exp_buffer.clear()
+
+            if self.local_episode % 25 == 0:
+                print(f"Agent: {self.n_agent}  episode {self.local_episode}")
+            if self.global_episode.value >= train_params.NUM_STEPS_TRAIN:
                 stop_agent_event.value = 1
                 print("Stop agent!")
 
@@ -65,7 +70,21 @@ class Agent:
                 action = self.ou_noise.get_action(action, step)
                 next_state, reward, done, _ = self.env_wrapper.step(action)
 
-                replay_queue.put((state, action, reward, next_state, done))
+                self.exp_buffer.append((state, action, reward))
+
+                # We need at least N steps in the experience buffer before we can compute Bellman
+                # rewards and add an N-step experience to replay memory
+                if len(self.exp_buffer) >= train_params.N_STEP_RETURNS:
+                    state_0, action_0, reward_0 = self.exp_buffer.popleft()
+                    discounted_reward = reward_0
+                    gamma = train_params.DISCOUNT_RATE
+                    for (_, _, r_i) in self.exp_buffer:
+                        discounted_reward += r_i * gamma
+                        gamma *= train_params.DISCOUNT_RATE
+
+                    replay_queue.put((state_0, action_0, discounted_reward, next_state, done))
+
+                #replay_queue.put((state, action, reward, next_state, done))
 
                 state = next_state
                 episode_reward += reward
@@ -74,10 +93,10 @@ class Agent:
                     break
 
             rewards.append(episode_reward)
-            if num_episode % train_params.UPDATE_AGENT_EP == 0:
+            if self.local_episode % train_params.UPDATE_AGENT_EP == 0:
                 print("Performing hard update of the local actor to the learner.")
                 self.update_actor_learner()
         print("Exit agent.")
 
-        plot(num_episode, rewards)
+        plot(self.local_episode, rewards)
         plt.savefig(f"reward_{self.config['model']}_{self.n_agent}.png")

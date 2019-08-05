@@ -35,6 +35,8 @@ def train():
     processes = []
     replay_queue = torch_mp.Queue(maxsize=64)
     stop_agent_event = torch_mp.Value('i', 0)
+    global_episode = torch_mp.Value('i', 0)
+    n_agents = 2
 
     batch_queue = torch_mp.Queue(maxsize=64)
     p = torch_mp.Process(target=sampler_worker, args=(replay_queue, batch_queue, stop_agent_event, batch_size))
@@ -44,9 +46,10 @@ def train():
     p = torch_mp.Process(target=learner.run, args=(stop_agent_event,))
     processes.append(p)
 
-    agent = Agent(config, actor_learner=learner.target_policy_net)
-    p = torch_mp.Process(target=agent.run, args=(replay_queue, stop_agent_event))
-    processes.append(p)
+    for i in range(n_agents):
+        agent = Agent(config, actor_learner=learner.target_policy_net, global_episode=global_episode, n_agent=i)
+        p = torch_mp.Process(target=agent.run, args=(replay_queue, stop_agent_event))
+        processes.append(p)
 
     for p in processes:
         p.start()
