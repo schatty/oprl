@@ -59,6 +59,7 @@ class Agent(object):
                 stop_agent_event.value = 1
                 self.save_replay_gif()
                 print("Stop agent!")
+                break
 
             state = self.env_wrapper.reset()
             self.ou_noise.reset()
@@ -94,7 +95,8 @@ class Agent(object):
         print("Exit agent.")
 
         plot(self.local_episode, rewards)
-        plt.savefig(f"reward_{self.config['model']}_{self.n_agent}.png")
+        output_dir = self.config['results_path']
+        plt.savefig(f"{output_dir}/reward-{self.config['model']}-process_{self.n_agent}-{episode_reward}.png")
 
     def save_replay_gif(self):
         output_dir = self.config['results_path']
@@ -115,4 +117,4 @@ class Agent(object):
 
             fn = f"{self.config['env']}-{self.config['model']}-{step}.gif"
             make_gif(tmpdirname, f"{output_dir}/{fn}")
-            print("fig saved to ", f"{output_dir}/{fn}")
+        print("fig saved to ", f"{output_dir}/{fn}")

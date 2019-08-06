@@ -25,6 +25,7 @@ def read_config(path):
         cfg = yaml.load(ymlfile)
 
     # Load environment from gym to set its params
+    print("env: ", cfg['env'])
     env = gym.make(cfg['env'])
     cfg['state_dims'] = env.observation_space.shape
     cfg['state_bound_low'] = env.observation_space.low
