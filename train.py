@@ -10,6 +10,26 @@ from models.utils import create_learner
 from models.agent import Agent
 from params import train_params
 
+import gym
+import yaml
+
+
+def read_config(path):
+    with open(path, 'r') as ymlfile:
+        cfg = yaml.load(ymlfile)
+
+    # Load environment from gym to set its params
+    env = gym.make(cfg['env'])
+    cfg['state_dims'] = env.observation_space.shape
+    cfg['state_bound_low'] = env.observation_space.low
+    cfg['state_bound_high'] = env.observation_space.high
+    cfg['action_dims'] = env.action_space.shape
+    cfg['action_bound_low'] = env.action_space.low
+    cfg['action_bound_high'] = env.action_space.high
+    del env
+
+    return cfg
+
 
 def sampler_worker(replay_queue, batch_queue, stop_agent_event, batch_size):
     replay_buffer = []
@@ -28,8 +48,7 @@ def sampler_worker(replay_queue, batch_queue, stop_agent_event, batch_size):
     print("Stop sampler worker.")
 
 
-def train():
-    config = {'model': 'd4pg', 'environment': 'Pendulum-v0'}
+def train(config):
     batch_size = train_params.BATCH_SIZE
 
     processes = []
@@ -60,4 +79,14 @@ def train():
 
 
 if __name__ == "__main__":
-    train()
+    #print("Looking at environment: ")
+    #print("state_dims: ", train_params.STATE_DIMS)
+    #print("state_bound_low: ", train_params.STATE_BOUND_LOW)
+    #print("state_bound_high: ", train_params.STATE_BOUND_HIGH)
+    #print("action_dims: ", train_params.ACTION_DIMS)
+    #print("action_bound_low: ", train_params.ACTION_BOUND_LOW)
+    #print("action_bound_high: ", train_params.ACTION_BOUND_HIGH)
+
+    config = read_config("config.yml")
+
+    train(config)

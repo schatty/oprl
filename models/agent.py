@@ -2,7 +2,6 @@ from collections import deque
 import gym
 import matplotlib.pyplot as plt
 
-from params import train_params
 from utils.env_wrapper import PendulumWrapper
 from .utils import create_actor
 from utils.utils import OUNoise, NormalizedActions, ReplayBuffer
@@ -15,18 +14,18 @@ def plot(frame_idx, rewards):
     plt.plot(rewards)
 
 
-class Agent:
+class Agent(object):
 
     def __init__(self, config, actor_learner, global_episode, n_agent=0):
         print(f"Initializing agent {n_agent}...")
         self.config = config
         self.n_agent = n_agent
-        self.max_steps = train_params.MAX_EP_LENGTH
+        self.max_steps = config['max_ep_length']
         self.global_episode = global_episode
         self.local_episode = 0
 
         # Create environment
-        env = config["environment"]
+        env = config["env"]
         if env == "Pendulum-v0":
             self.env_wrapper = PendulumWrapper(env)
         else:
@@ -36,8 +35,10 @@ class Agent:
         self.ou_noise = OUNoise(self.env_wrapper.action_space)
 
         self.actor_learner = actor_learner
-        self.actor = create_actor(model_name=config['model'], num_actions=train_params.ACTION_DIMS[0], num_inputs=train_params.STATE_DIMS[0],
-                                  hidden_size=train_params.DENSE1_SIZE)
+        self.actor = create_actor(model_name=config['model'],
+                                  num_actions=config['action_dims'][0],
+                                  num_inputs=config['state_dims'][0],
+                                  hidden_size=config['dense1_size'])
 
     def update_actor_learner(self):
         """Update local actor to the actor from learner. """
@@ -59,7 +60,7 @@ class Agent:
 
             if self.local_episode % 25 == 0:
                 print(f"Agent: {self.n_agent}  episode {self.local_episode}")
-            if self.global_episode.value >= train_params.NUM_STEPS_TRAIN:
+            if self.global_episode.value >= self.config['num_episodes_train']:
                 stop_agent_event.value = 1
                 print("Stop agent!")
 
@@ -74,13 +75,13 @@ class Agent:
 
                 # We need at least N steps in the experience buffer before we can compute Bellman
                 # rewards and add an N-step experience to replay memory
-                if len(self.exp_buffer) >= train_params.N_STEP_RETURNS:
+                if len(self.exp_buffer) >= self.config['n_step_returns']:
                     state_0, action_0, reward_0 = self.exp_buffer.popleft()
                     discounted_reward = reward_0
-                    gamma = train_params.DISCOUNT_RATE
+                    gamma = self.config['discount_rate']
                     for (_, _, r_i) in self.exp_buffer:
                         discounted_reward += r_i * gamma
-                        gamma *= train_params.DISCOUNT_RATE
+                        gamma *= self.config['discount_rate']
 
                     replay_queue.put((state_0, action_0, discounted_reward, next_state, done))
 
@@ -93,7 +94,7 @@ class Agent:
                     break
 
             rewards.append(episode_reward)
-            if self.local_episode % train_params.UPDATE_AGENT_EP == 0:
+            if self.local_episode % self.config['update_agent_ep'] == 0:
                 print("Performing hard update of the local actor to the learner.")
                 self.update_actor_learner()
         print("Exit agent.")

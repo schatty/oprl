@@ -1,16 +1,10 @@
-import math
-import random
 import gym
 import numpy as np
-import matplotlib.pyplot as plt
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from torch.distributions import Normal
 
-from params import train_params
 from utils.utils import OUNoise, ReplayBuffer, NormalizedActions
 
 
@@ -67,7 +61,7 @@ class LearnerD3PG(object):
 
         state_dim = self.env.observation_space.shape[0]
         action_dim = self.env.action_space.shape[0]
-        hidden_dim = train_params.DENSE1_SIZE
+        hidden_dim = config['dense1_size']
 
         self.value_net = ValueNetwork(state_dim, action_dim, hidden_dim).to(device)
         self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim).to(device)
@@ -89,10 +83,10 @@ class LearnerD3PG(object):
 
         self.value_criterion = nn.MSELoss()
 
-        self.max_frames = train_params.NUM_STEPS_TRAIN
+        self.max_frames = config['num_episodes_train']
         self.max_steps = 1000
         self.frame_idx = 0
-        self.batch_size = train_params.BATCH_SIZE
+        self.batch_size = config['batch_size']
 
     def ddpg_update(self, batch, batch_size, gamma=0.99, min_value=-np.inf, max_value=np.inf, soft_tau=1e-2):
         state, action, reward, next_state, done = batch
@@ -145,7 +139,7 @@ class LearnerD3PG(object):
     def run(self, stop_agent_event):
         while not self.batch_queue.empty() or not stop_agent_event.value:
             if self.batch_queue.empty():
-                print("Continuing as batch queue empty")
+                #print("Continuing as batch queue empty")
                 continue
             batch = list(zip(*self.batch_queue.get()))
             self.ddpg_update(batch, self.batch_size)
