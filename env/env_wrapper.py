@@ -1,7 +1,5 @@
 import gym
 
-from utils.utils import NormalizedActions
-
 
 class EnvWrapper:
     def __init__(self, env_name):
@@ -29,5 +27,8 @@ class EnvWrapper:
 
     def close(self):
         self.env.close()
+
+    def get_action_space(self):
+        return self.env.action_space
 
 

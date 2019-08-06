@@ -4,14 +4,14 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 
-from utils.utils import OUNoise, ReplayBuffer, NormalizedActions
+from utils.utils import OUNoise, ReplayBuffer
 from env.utils import create_env_wrapper
 
 
 class ValueNetwork(nn.Module):
     """Critic - return Q value from given states and actions. """
 
-    def __init__(self, num_states, num_actions, hidden_size, init_w=3e-3):
+    def __init__(self, num_states, num_actions, hidden_size, init_w=3e-3, device='cuda'):
         """
         Args:
             num_states (int): state dimension
@@ -28,6 +28,8 @@ class ValueNetwork(nn.Module):
         self.linear3.weight.data.uniform_(-init_w, init_w)
         self.linear3.bias.data.uniform_(-init_w, init_w)
 
+        self.to(device)
+
     def forward(self, state, action):
         x = torch.cat([state, action], 1)
         x = F.relu(self.linear1(x))
@@ -39,7 +41,7 @@ class ValueNetwork(nn.Module):
 class PolicyNetwork(nn.Module):
     """Actor - return action value given states. """
 
-    def __init__(self, num_states, num_actions, hidden_size, init_w=3e-3):
+    def __init__(self, num_states, num_actions, hidden_size, init_w=3e-3, device='cuda'):
         """
         Args:
             num_states (int): state dimension
@@ -48,6 +50,7 @@ class PolicyNetwork(nn.Module):
             init_w:
         """
         super(PolicyNetwork, self).__init__()
+        self.device = device
 
         self.linear1 = nn.Linear(num_states, hidden_size)
         self.linear2 = nn.Linear(hidden_size, hidden_size)
@@ -56,7 +59,7 @@ class PolicyNetwork(nn.Module):
         self.linear3.weight.data.uniform_(-init_w, init_w)
         self.linear3.bias.data.uniform_(-init_w, init_w)
 
-        self.to('cuda')
+        self.to(device)
 
     def forward(self, state):
         x = F.relu(self.linear1(state))
@@ -65,7 +68,7 @@ class PolicyNetwork(nn.Module):
         return x
 
     def get_action(self, state):
-        state = torch.from_numpy(state).float().unsqueeze(0).to('cuda')
+        state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
         action = self.forward(state)
         return action.detach().cpu().numpy().item()
 
@@ -94,15 +97,15 @@ class LearnerD3PG(object):
         self.tau = config['tau']
 
         # Noise process
-        env = create_env_wrapper(config['env'])
-        self.ou_noise = OUNoise(env.action_space)
+        env = create_env_wrapper(config)
+        self.ou_noise = OUNoise(env.get_action_space())
         del env
 
         # Value and policy nets
-        self.value_net = ValueNetwork(state_dim, action_dim, hidden_dim).to(self.device)
-        self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim).to(self.device)
-        self.target_value_net = ValueNetwork(state_dim, action_dim, hidden_dim).to(self.device)
-        self.target_policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim).to(self.device)
+        self.value_net = ValueNetwork(state_dim, action_dim, hidden_dim, device=self.device)
+        self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim, device=self.device)
+        self.target_value_net = ValueNetwork(state_dim, action_dim, hidden_dim, device=self.device)
+        self.target_policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim, device=self.device)
 
         for target_param, param in zip(self.target_value_net.parameters(), self.value_net.parameters()):
             target_param.data.copy_(param.data)
@@ -169,6 +172,6 @@ class LearnerD3PG(object):
                 #print("Continuing as batch queue empty")
                 continue
             batch = list(zip(*self.batch_queue.get()))
-            self.ddpg_update(batch, self.batch_size)
+            self.ddpg_update(batch)
         print("Exit learner.")
 

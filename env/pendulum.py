@@ -1,5 +1,6 @@
 from .env_wrapper import EnvWrapper
 
+
 class PendulumWrapper(EnvWrapper):
     def __init__(self, config):
         EnvWrapper.__init__(self, config['env'])
@@ -24,9 +25,7 @@ class PendulumWrapper(EnvWrapper):
         # Min reward occurs at max angle (theta_max), max rotational velocity (theta_dot_max) and max effort (action_max) - approx -16.27
 
     def normalise_state(self, state):
-        # Normalise state values to [-1, 1] range
-        return state / self.config['state_bound_high']
+        return state
 
     def normalise_reward(self, reward):
-        # Normalise reward values
-        return reward / 100.0
+        return reward

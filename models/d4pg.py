@@ -12,7 +12,7 @@ class ValueNetwork(nn.Module):
     """Critic - return Q value from given states and actions. """
 
     def __init__(self, num_states, num_actions, hidden_size, v_min, v_max,
-                 num_atoms, init_w=3e-3):
+                 num_atoms, init_w=3e-3, device='cuda'):
         """
         Args:
             num_states (int): state dimension
@@ -34,6 +34,8 @@ class ValueNetwork(nn.Module):
 
         self.z_atoms = np.linspace(v_min, v_max, num_atoms)
 
+        self.to(device)
+
     def forward(self, state, action):
         x = torch.cat([state, action], 1)
         x = F.relu(self.linear1(x))
@@ -48,7 +50,7 @@ class ValueNetwork(nn.Module):
 class PolicyNetwork(nn.Module):
     """Actor - return action value given states. """
 
-    def __init__(self, num_states, num_actions, hidden_size, init_w=3e-3):
+    def __init__(self, num_states, num_actions, hidden_size, init_w=3e-3, device='cuda'):
         """
         Args:
             num_states (int): state dimension
@@ -57,6 +59,7 @@ class PolicyNetwork(nn.Module):
             init_w:
         """
         super(PolicyNetwork, self).__init__()
+        self.device = device
 
         self.linear1 = nn.Linear(num_states, hidden_size)
         self.linear2 = nn.Linear(hidden_size, hidden_size)
@@ -65,7 +68,7 @@ class PolicyNetwork(nn.Module):
         self.linear3.weight.data.uniform_(-init_w, init_w)
         self.linear3.bias.data.uniform_(-init_w, init_w)
 
-        self.to('cuda')
+        self.to(device)
 
     def forward(self, state):
         x = F.relu(self.linear1(state))
@@ -77,7 +80,7 @@ class PolicyNetwork(nn.Module):
         return x
 
     def get_action(self, state):
-        state = torch.tensor(state).float().unsqueeze(0).to('cuda')
+        state = torch.tensor(state).float().unsqueeze(0).to(self.device)
         action = self.forward(state)
         return action.detach().cpu().numpy().item()
 
@@ -87,10 +90,10 @@ class LearnerD4PG(object):
 
     def __init__(self, config, batch_queue):
         hidden_dim = config['dense_size']
-        state_dim = config['state_dims']
-        action_dim = config['action_dims']
+        state_dim = config['state_dims'][0]
+        action_dim = config['action_dims'][0]
         value_lr = config['critic_learning_rate']
-        policy_lr = config['policy_learning_rate']
+        policy_lr = config['actor_learning_rate']
         v_min = config['v_min']
         v_max = config['v_max']
         num_atoms = config['num_atoms']
@@ -104,15 +107,15 @@ class LearnerD4PG(object):
         self.batch_queue = batch_queue
 
         # Noise process
-        env = create_env_wrapper(config['env'])
-        self.ou_noise = OUNoise(env.action_space)
+        env = create_env_wrapper(config)
+        self.ou_noise = OUNoise(env.get_action_space())
         del env
 
         # Value and policy nets
-        self.value_net = ValueNetwork(state_dim, action_dim, hidden_dim, v_min, v_max, num_atoms).to(self.device)
-        self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim).to(self.device)
-        self.target_value_net = ValueNetwork(state_dim, action_dim, hidden_dim, v_min, v_max, num_atoms).to(self.device)
-        self.target_policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim).to(self.device)
+        self.value_net = ValueNetwork(state_dim, action_dim, hidden_dim, v_min, v_max, num_atoms, device=self.device)
+        self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim, device=self.device)
+        self.target_value_net = ValueNetwork(state_dim, action_dim, hidden_dim, v_min, v_max, num_atoms, device=self.device)
+        self.target_policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim, device=self.device)
 
         for target_param, param in zip(self.target_value_net.parameters(), self.value_net.parameters()):
             target_param.data.copy_(param.data)
@@ -195,5 +198,5 @@ class LearnerD4PG(object):
             if self.batch_queue.empty():
                 continue
             batch = list(zip(*self.batch_queue.get()))
-            self.ddpg_update(batch, self.batch_size)
+            self.ddpg_update(batch)
         print("Exit learner.")

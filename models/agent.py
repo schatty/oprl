@@ -24,8 +24,8 @@ class Agent(object):
         self.local_episode = 0
 
         # Create environment
-        self.env_wrapper =  create_env_wrapper(config['env'])
-        self.ou_noise = OUNoise(self.env_wrapper.action_space)
+        self.env_wrapper = create_env_wrapper(config)
+        self.ou_noise = OUNoise(self.env_wrapper.get_action_space())
 
         self.actor_learner = actor_learner
         self.actor = create_actor(model_name=config['model'],
@@ -62,7 +62,7 @@ class Agent(object):
             for step in range(self.max_steps):
                 action = self.actor.get_action(state)
                 action = self.ou_noise.get_action(action, step)
-                next_state, reward, done, _ = self.env_wrapper.step(action)
+                next_state, reward, done = self.env_wrapper.step(action)
 
                 self.exp_buffer.append((state, action, reward))
 
