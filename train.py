@@ -5,16 +5,22 @@ try:
     set_start_method('spawn')
 except RuntimeError:
     pass
-
-from models.utils import create_learner
-from models.agent import Agent
-from params import train_params
-
 import gym
 import yaml
 
+from models.utils import create_learner
+from models.agent import Agent
+
 
 def read_config(path):
+    """
+    Return python dict from .yml file.
+
+    Args:
+        path (str): path to the .yml config.
+
+    Returns (dict): configuration object.
+    """
     with open(path, 'r') as ymlfile:
         cfg = yaml.load(ymlfile)
 
@@ -31,16 +37,36 @@ def read_config(path):
     return cfg
 
 
-def sampler_worker(replay_queue, batch_queue, stop_agent_event, batch_size):
+def sampler_worker(config, replay_queue, batch_queue, stop_agent_event):
+    """
+    Function that transfers replay to the buffer and batches from buffer to the queue.
+
+    Args:
+        config:
+        replay_queue:
+        batch_queue:
+        stop_agent_event:
+
+    Returns:
+
+    """
+    num_agents = config['num_agents']
+    batch_size = config['batch_size']
+
+    # TODO: Replace with data structure
     replay_buffer = []
+
     while not stop_agent_event.value or not replay_queue.empty():
-        if not replay_queue.empty():
+        # (1) Transfer replays to global buffer
+        for _ in range(num_agents):
+            if replay_queue.empty():
+                break
             replay = replay_queue.get()
             replay_buffer.append(replay)
 
+        # (2) Transfer batch of replay from buffer to the batch_queue
         if len(replay_buffer) < batch_size:
             continue
-
         idxes = [random.randint(0, len(replay_buffer) - 1) for _ in range(batch_size)]
         elems = [replay_buffer[i] for i in idxes]
         batch_queue.put(elems)
@@ -49,22 +75,29 @@ def sampler_worker(replay_queue, batch_queue, stop_agent_event, batch_size):
 
 
 def train(config):
-    batch_size = train_params.BATCH_SIZE
 
+    # Config
+    replay_queue_size = config['replay_queue_size']
+    batch_queue_size = config['batch_queue_size']
+    n_agents = config['num_agents']
+
+    # Data structures
     processes = []
-    replay_queue = torch_mp.Queue(maxsize=64)
+    replay_queue = torch_mp.Queue(maxsize=replay_queue_size)
     stop_agent_event = torch_mp.Value('i', 0)
     global_episode = torch_mp.Value('i', 0)
-    n_agents = 2
 
-    batch_queue = torch_mp.Queue(maxsize=64)
-    p = torch_mp.Process(target=sampler_worker, args=(replay_queue, batch_queue, stop_agent_event, batch_size))
+    # Data sampler
+    batch_queue = torch_mp.Queue(maxsize=batch_queue_size)
+    p = torch_mp.Process(target=sampler_worker, args=(config, replay_queue, batch_queue, stop_agent_event))
     processes.append(p)
 
+    # Learner (neural net training process)
     learner = create_learner(config, batch_queue)
     p = torch_mp.Process(target=learner.run, args=(stop_agent_event,))
     processes.append(p)
 
+    # Agents (exploration processes)
     for i in range(n_agents):
         agent = Agent(config, actor_learner=learner.target_policy_net, global_episode=global_episode, n_agent=i)
         p = torch_mp.Process(target=agent.run, args=(replay_queue, stop_agent_event))
@@ -72,21 +105,12 @@ def train(config):
 
     for p in processes:
         p.start()
-
     for p in processes:
         p.join()
+
     print("End.")
 
 
 if __name__ == "__main__":
-    #print("Looking at environment: ")
-    #print("state_dims: ", train_params.STATE_DIMS)
-    #print("state_bound_low: ", train_params.STATE_BOUND_LOW)
-    #print("state_bound_high: ", train_params.STATE_BOUND_HIGH)
-    #print("action_dims: ", train_params.ACTION_DIMS)
-    #print("action_bound_low: ", train_params.ACTION_BOUND_LOW)
-    #print("action_bound_high: ", train_params.ACTION_BOUND_HIGH)
-
     config = read_config("config.yml")
-
     train(config)

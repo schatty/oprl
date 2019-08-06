@@ -1,10 +1,9 @@
 from collections import deque
-import gym
 import matplotlib.pyplot as plt
 
-from utils.env_wrapper import PendulumWrapper
 from .utils import create_actor
-from utils.utils import OUNoise, NormalizedActions, ReplayBuffer
+from utils.utils import OUNoise, ReplayBuffer
+from env.utils import create_env_wrapper
 
 
 def plot(frame_idx, rewards):
@@ -25,20 +24,14 @@ class Agent(object):
         self.local_episode = 0
 
         # Create environment
-        env = config["env"]
-        if env == "Pendulum-v0":
-            self.env_wrapper = PendulumWrapper(env)
-        else:
-            raise Exception("Unknown environment")
-
-        self.env_wrapper = NormalizedActions(gym.make("Pendulum-v0"))
+        self.env_wrapper =  create_env_wrapper(config['env'])
         self.ou_noise = OUNoise(self.env_wrapper.action_space)
 
         self.actor_learner = actor_learner
         self.actor = create_actor(model_name=config['model'],
                                   num_actions=config['action_dims'][0],
-                                  num_inputs=config['state_dims'][0],
-                                  hidden_size=config['dense1_size'])
+                                  num_states=config['state_dims'][0],
+                                  hidden_size=config['dense_size'])
 
     def update_actor_learner(self):
         """Update local actor to the actor from learner. """
@@ -84,8 +77,6 @@ class Agent(object):
                         gamma *= self.config['discount_rate']
 
                     replay_queue.put((state_0, action_0, discounted_reward, next_state, done))
-
-                #replay_queue.put((state, action, reward, next_state, done))
 
                 state = next_state
                 episode_reward += reward

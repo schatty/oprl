@@ -1,4 +1,3 @@
-import gym
 import numpy as np
 import torch
 import torch.nn as nn
@@ -6,13 +5,23 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 from utils.utils import OUNoise, ReplayBuffer, NormalizedActions
+from env.utils import create_env_wrapper
 
 
 class ValueNetwork(nn.Module):
-    def __init__(self, num_inputs, num_actions, hidden_size, init_w=3e-3):
+    """Critic - return Q value from given states and actions. """
+
+    def __init__(self, num_states, num_actions, hidden_size, init_w=3e-3):
+        """
+        Args:
+            num_states (int): state dimension
+            num_actions (int): action dimension
+            hidden_size (int): number of neurons in hidden layers
+            init_w:
+        """
         super(ValueNetwork, self).__init__()
 
-        self.linear1 = nn.Linear(num_inputs + num_actions, hidden_size)
+        self.linear1 = nn.Linear(num_states + num_actions, hidden_size)
         self.linear2 = nn.Linear(hidden_size, hidden_size)
         self.linear3 = nn.Linear(hidden_size, 1)
 
@@ -28,10 +37,19 @@ class ValueNetwork(nn.Module):
 
 
 class PolicyNetwork(nn.Module):
-    def __init__(self, num_inputs, num_actions, hidden_size, init_w=3e-3):
+    """Actor - return action value given states. """
+
+    def __init__(self, num_states, num_actions, hidden_size, init_w=3e-3):
+        """
+        Args:
+            num_states (int): state dimension
+            num_actions (action): action dimension
+            hidden_size (int): hidden size dimension
+            init_w:
+        """
         super(PolicyNetwork, self).__init__()
 
-        self.linear1 = nn.Linear(num_inputs, hidden_size)
+        self.linear1 = nn.Linear(num_states, hidden_size)
         self.linear2 = nn.Linear(hidden_size, hidden_size)
         self.linear3 = nn.Linear(hidden_size, num_actions)
 
@@ -53,21 +71,38 @@ class PolicyNetwork(nn.Module):
 
 
 class LearnerD3PG(object):
+    """Policy and value network update routine. """
+
     def __init__(self, config, batch_queue):
+        """
+        Args:
+            config (dict): configuration
+            batch_queue (multiproc.queue): queue with batches of replays
+        """
+        hidden_dim = config['dense_size']
+        value_lr = config['critic_learning_rate']
+        policy_lr = config['actor_learning_rate']
+        state_dim = config['state_dims'][0]
+        action_dim = config['action_dims'][0]
+        self.device = config['device']
+        self.max_frames = config['num_episodes_train']
+        self.max_steps = config['max_ep_length']
+        self.frame_idx = 0
+        self.batch_size = config['batch_size']
         self.batch_queue = batch_queue
-        self.env = NormalizedActions(gym.make("Pendulum-v0"))
-        self.ou_noise = OUNoise(self.env.action_space)
-        device = 'cuda:0'
+        self.gamma = config['discount_rate']
+        self.tau = config['tau']
 
-        state_dim = self.env.observation_space.shape[0]
-        action_dim = self.env.action_space.shape[0]
-        hidden_dim = config['dense1_size']
+        # Noise process
+        env = create_env_wrapper(config['env'])
+        self.ou_noise = OUNoise(env.action_space)
+        del env
 
-        self.value_net = ValueNetwork(state_dim, action_dim, hidden_dim).to(device)
-        self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim).to(device)
-
-        self.target_value_net = ValueNetwork(state_dim, action_dim, hidden_dim).to(device)
-        self.target_policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim).to(device)
+        # Value and policy nets
+        self.value_net = ValueNetwork(state_dim, action_dim, hidden_dim).to(self.device)
+        self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim).to(self.device)
+        self.target_value_net = ValueNetwork(state_dim, action_dim, hidden_dim).to(self.device)
+        self.target_policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim).to(self.device)
 
         for target_param, param in zip(self.target_value_net.parameters(), self.value_net.parameters()):
             target_param.data.copy_(param.data)
@@ -75,39 +110,30 @@ class LearnerD3PG(object):
         for target_param, param in zip(self.target_policy_net.parameters(), self.policy_net.parameters()):
             target_param.data.copy_(param.data)
 
-        value_lr = 1e-3
-        policy_lr = 1e-4
-
         self.value_optimizer = optim.Adam(self.value_net.parameters(), lr=value_lr)
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=policy_lr)
 
         self.value_criterion = nn.MSELoss()
 
-        self.max_frames = config['num_episodes_train']
-        self.max_steps = 1000
-        self.frame_idx = 0
-        self.batch_size = config['batch_size']
-
-    def ddpg_update(self, batch, batch_size, gamma=0.99, min_value=-np.inf, max_value=np.inf, soft_tau=1e-2):
+    def ddpg_update(self, batch, min_value=-np.inf, max_value=np.inf):
         state, action, reward, next_state, done = batch
-
         state = np.asarray(state)
         action = np.asarray(action)
         reward = np.asarray(reward)
         next_state = np.asarray(next_state)
         done = np.asarray(done)
 
-        state = torch.from_numpy(state).float().to('cuda')
-        next_state = torch.from_numpy(next_state).float().to('cuda')
-        action = torch.from_numpy(action).float().to('cuda')
-        reward = torch.from_numpy(reward).float().unsqueeze(1).to('cuda')
-        done = torch.from_numpy(done).float().unsqueeze(1).to('cuda')
+        state = torch.from_numpy(state).float().to(self.device)
+        next_state = torch.from_numpy(next_state).float().to(self.device)
+        action = torch.from_numpy(action).float().to(self.device)
+        reward = torch.from_numpy(reward).float().unsqueeze(1).to(self.device)
+        done = torch.from_numpy(done).float().unsqueeze(1).to(self.device)
 
-        # Update critic
+        # ------- Update critic -------
 
         next_action = self.target_policy_net(next_state)
         target_value = self.target_value_net(next_state, next_action.detach())
-        expected_value = reward + (1.0 - done) * gamma * target_value
+        expected_value = reward + (1.0 - done) * self.gamma * target_value
         expected_value = torch.clamp(expected_value, min_value, max_value)
 
         value = self.value_net(state, action)
@@ -117,7 +143,7 @@ class LearnerD3PG(object):
         value_loss.backward()
         self.value_optimizer.step()
 
-        # Update actor
+        # -------- Update actor --------
 
         policy_loss = self.value_net(state, self.policy_net(state))
         policy_loss = -policy_loss.mean()
@@ -126,14 +152,15 @@ class LearnerD3PG(object):
         policy_loss.backward()
         self.policy_optimizer.step()
 
+        # Soft update
         for target_param, param in zip(self.target_value_net.parameters(), self.value_net.parameters()):
             target_param.data.copy_(
-                target_param.data * (1.0 - soft_tau) + param.data * soft_tau
+                target_param.data * (1.0 - self.tau) + param.data * self.tau
             )
 
         for target_param, param in zip(self.target_policy_net.parameters(), self.policy_net.parameters()):
             target_param.data.copy_(
-                target_param.data * (1.0 - soft_tau) + param.data * soft_tau
+                target_param.data * (1.0 - self.tau) + param.data * self.tau
             )
 
     def run(self, stop_agent_event):

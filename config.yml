@@ -2,13 +2,13 @@
 
 env: Pendulum-v0
 random_seed: 2019
-num_agents: 1
+num_agents: 2
 
 # Training parameters
 
-model: d4pg
+model: d3pg
 batch_size: 256
-num_episodes_train: 20 # number of episodes from all agents
+num_episodes_train: 50 # number of episodes from all agents
 max_ep_length: 1000 # maximum number of steps per episode
 replay_mem_size: 1000000 # maximum capacity of replay memory
 priority_alpha: 0.6 # controls the randomness vs prioritisation of the prioritised sampling (0.0 = Uniform sampling, 1.0 = Greedy prioritisation)
@@ -17,16 +17,18 @@ priority_beta_end: 1.0 # beta will be linearly annelaed from its start value to 
 discount_rate: 0.99 # Discount rate (gamma) for future rewards
 n_step_returns: 5 # number of future steps to collect experiences for N-step returns
 update_agent_ep: 1 # agent gets latest parameters from learner every update_agent_ep episodes
+replay_queue_size: 64 # queue with replays from all the agents
+batch_queue_size: 64 # queue with batches given to learner
+device: cuda
 
 # Network parameters
 
-critic_learning_rate: 0.0001
+critic_learning_rate: 0.001
 actor_learning_rate: 0.0001
-dense1_size: 300 # size of the first hidden layer in networks
-dense2_size: 300 # size of the second hidden layer in networks
+dense_size: 300 # size of the 2 hidden layers in networks
 final_layer_init: 0.003
 num_atoms: 51 # number of atoms in output layer of distributed critic
 v_min: -20.0 # lower bound of critic value output distribution
 v_max: 0.0 # upper bound of critic value output distribution
-tau: 0.001 # parameter for soft target network updates
+tau: 0.01 # parameter for soft target network updates
 
