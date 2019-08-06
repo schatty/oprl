@@ -1,8 +1,10 @@
+import tempfile
+import os
 from collections import deque
 import matplotlib.pyplot as plt
 
 from .utils import create_actor
-from utils.utils import OUNoise, ReplayBuffer
+from utils.utils import OUNoise, ReplayBuffer, make_gif
 from env.utils import create_env_wrapper
 
 
@@ -55,6 +57,7 @@ class Agent(object):
                 print(f"Agent: {self.n_agent}  episode {self.local_episode}")
             if self.global_episode.value >= self.config['num_episodes_train']:
                 stop_agent_event.value = 1
+                self.save_replay_gif()
                 print("Stop agent!")
 
             state = self.env_wrapper.reset()
@@ -92,3 +95,24 @@ class Agent(object):
 
         plot(self.local_episode, rewards)
         plt.savefig(f"reward_{self.config['model']}_{self.n_agent}.png")
+
+    def save_replay_gif(self):
+        output_dir = self.config['results_path']
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            state = self.env_wrapper.reset()
+            for step in range(self.max_steps):
+                action = self.actor.get_action(state)
+                action = self.ou_noise.get_action(action, step)
+                next_state, reward, done = self.env_wrapper.step(action)
+                img = self.env_wrapper.render()
+                plt.imsave(fname=f"{tmpdirname}/{step}.png", arr=img)
+                state = next_state
+                if done:
+                    break
+
+            fn = f"{self.config['env']}-{self.config['model']}-{step}.gif"
+            make_gif(tmpdirname, f"{output_dir}/{fn}")
+            print("fig saved to ", f"{output_dir}/{fn}")

@@ -1,6 +1,9 @@
 import random
 import numpy as np
 import gym
+from PIL import Image
+from glob import glob
+import os
 
 
 class OUNoise(object):
@@ -51,3 +54,20 @@ class ReplayBuffer:
         return len(self.buffer)
 
 
+def make_gif(source_dir, output):
+    """
+    Make gif file from set of .jpeg images.
+    Args:
+        source_dir (str): path with .jpeg images
+        output (str): path to the output .gif file
+    Returns: None
+    """
+    batch_sort = lambda s: int(s[s.rfind('/')+1:s.rfind('.')])
+    image_paths = sorted(glob(os.path.join(source_dir, "*.png")),
+                         key=batch_sort)
+    frames = []
+    for path in image_paths:
+        img = Image.open(path)
+        frames.append(img)
+    frames[0].save(output, format='GIF', append_images=frames[1:],
+                   save_all=True, duration=15, loop=0)
