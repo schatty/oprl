@@ -1,29 +1,25 @@
 import tempfile
 import os
+import time
 from collections import deque
 import matplotlib.pyplot as plt
 
 from .utils import create_actor
 from utils.utils import OUNoise, ReplayBuffer, make_gif
 from env.utils import create_env_wrapper
-
-
-def plot(frame_idx, rewards):
-    plt.figure(figsize=(20, 5))
-    plt.subplot(131)
-    plt.title(f"frame {frame_idx}. reward {rewards[-1]}")
-    plt.plot(rewards)
+from utils.logger import Logger
 
 
 class Agent(object):
 
-    def __init__(self, config, actor_learner, global_episode, n_agent=0):
+    def __init__(self, config, actor_learner, global_episode, n_agent=0, log_dir=''):
         print(f"Initializing agent {n_agent}...")
         self.config = config
         self.n_agent = n_agent
         self.max_steps = config['max_ep_length']
         self.global_episode = global_episode
         self.local_episode = 0
+        self.log_dir = log_dir
 
         # Create environment
         self.env_wrapper = create_env_wrapper(config)
@@ -34,6 +30,9 @@ class Agent(object):
                                   num_actions=config['action_dims'][0],
                                   num_states=config['state_dims'][0],
                                   hidden_size=config['dense_size'])
+        # Logger
+        log_path = f"{log_dir}/agent-{n_agent}.pkl"
+        self.logger = Logger(log_path)
 
     def update_actor_learner(self):
         """Update local actor to the actor from learner. """
@@ -57,15 +56,16 @@ class Agent(object):
                 print(f"Agent: {self.n_agent}  episode {self.local_episode}")
             if self.global_episode.value >= self.config['num_episodes_train']:
                 stop_agent_event.value = 1
-                self.save_replay_gif()
                 print("Stop agent!")
                 break
 
+            ep_start_time = time.time()
             state = self.env_wrapper.reset()
             self.ou_noise.reset()
             for step in range(self.max_steps):
                 action = self.actor.get_action(state)
                 action = self.ou_noise.get_action(action, step)
+                action = action.squeeze(0)
                 next_state, reward, done = self.env_wrapper.step(action)
 
                 self.exp_buffer.append((state, action, reward))
@@ -80,7 +80,7 @@ class Agent(object):
                         discounted_reward += r_i * gamma
                         gamma *= self.config['discount_rate']
 
-                    replay_queue.put((state_0, action_0, discounted_reward, next_state, done))
+                    replay_queue.put([state_0, action_0, discounted_reward, next_state, done])
 
                 state = next_state
                 episode_reward += reward
@@ -88,21 +88,26 @@ class Agent(object):
                 if done:
                     break
 
+            # Log metrics
+            self.logger.scalar_summary("reward", episode_reward)
+            self.logger.scalar_summary("episode_timing", time.time() - ep_start_time)
+
             rewards.append(episode_reward)
             if self.local_episode % self.config['update_agent_ep'] == 0:
                 print("Performing hard update of the local actor to the learner.")
                 self.update_actor_learner()
-        print("Exit agent.")
 
-        plot(self.local_episode, rewards)
-        output_dir = self.config['results_path']
-        plt.savefig(f"{output_dir}/reward-{self.config['model']}-process_{self.n_agent}-{episode_reward}.png")
+        print("Emptying replay queue")
+        while not replay_queue.empty():
+            replay_queue.get()
+
+        # Save replay from the first agent only
+        if self.n_agent == 0:
+            self.save_replay_gif()
+
+        print("Agent done.")
 
     def save_replay_gif(self):
-        output_dir = self.config['results_path']
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-
         with tempfile.TemporaryDirectory() as tmpdirname:
             state = self.env_wrapper.reset()
             for step in range(self.max_steps):
@@ -116,5 +121,5 @@ class Agent(object):
                     break
 
             fn = f"{self.config['env']}-{self.config['model']}-{step}.gif"
-            make_gif(tmpdirname, f"{output_dir}/{fn}")
-        print("fig saved to ", f"{output_dir}/{fn}")
+            make_gif(tmpdirname, f"{self.log_dir}/{fn}")
+        print("fig saved to ", f"{self.log_dir}/{fn}")

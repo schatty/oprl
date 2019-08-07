@@ -4,6 +4,7 @@ import gym
 from PIL import Image
 from glob import glob
 import os
+import yaml
 
 
 class OUNoise(object):
@@ -77,3 +78,29 @@ def make_gif(source_dir, output):
         frames.append(img)
     frames[0].save(output, format='GIF', append_images=frames[1:],
                    save_all=True, duration=15, loop=0)
+
+
+def read_config(path):
+    """
+    Return python dict from .yml file.
+
+    Args:
+        path (str): path to the .yml config.
+
+    Returns (dict): configuration object.
+    """
+    with open(path, 'r') as ymlfile:
+        cfg = yaml.load(ymlfile)
+
+    # Load environment from gym to set its params
+    print("env: ", cfg['env'])
+    env = gym.make(cfg['env'])
+    cfg['state_dims'] = env.observation_space.shape
+    cfg['state_bound_low'] = env.observation_space.low
+    cfg['state_bound_high'] = env.observation_space.high
+    cfg['action_dims'] = env.action_space.shape
+    cfg['action_bound_low'] = env.action_space.low
+    cfg['action_bound_high'] = env.action_space.high
+    del env
+
+    return cfg

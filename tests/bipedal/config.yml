@@ -2,13 +2,13 @@
 
 env: BipedalWalker-v2
 random_seed: 2019
-num_agents: 3
+num_agents: 4
 
 # Training parameters
 
 model: d3pg
 batch_size: 256
-num_episodes_train: 1000 # number of episodes from all agents
+num_episodes_train: 5000 # number of episodes from all agents
 max_ep_length: 1000 # maximum number of steps per episode
 replay_mem_size: 1000000 # maximum capacity of replay memory
 priority_alpha: 0.6 # controls the randomness vs prioritisation of the prioritised sampling (0.0 = Uniform sampling, 1.0 = Greedy prioritisation)
@@ -16,7 +16,7 @@ priority_beta_start: 0.4 # starting value of beta - controls to what degree IS w
 priority_beta_end: 1.0 # beta will be linearly annelaed from its start value to this value thoughout training
 discount_rate: 0.99 # Discount rate (gamma) for future rewards
 n_step_returns: 5 # number of future steps to collect experiences for N-step returns
-update_agent_ep: 3 # agent gets latest parameters from learner every update_agent_ep episodes
+update_agent_ep: 4 # agent gets latest parameters from learner every update_agent_ep episodes
 replay_queue_size: 64 # queue with replays from all the agents
 batch_queue_size: 64 # queue with batches given to learner
 device: cuda

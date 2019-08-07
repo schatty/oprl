@@ -32,3 +32,6 @@ v_min: -20.0 # lower bound of critic value output distribution
 v_max: 0.0 # upper bound of critic value output distribution
 tau: 0.01 # parameter for soft target network updates
 
+# Miscellaneous
+results_path: results
+

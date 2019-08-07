@@ -3,9 +3,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
+import time
 
 from utils.utils import OUNoise, ReplayBuffer
 from env.utils import create_env_wrapper
+from utils.logger import Logger
 
 
 class ValueNetwork(nn.Module):
@@ -31,11 +33,6 @@ class ValueNetwork(nn.Module):
         self.to(device)
 
     def forward(self, state, action):
-        #print("State: ", state.shape)
-        #print("Action: ", action.shape)
-        # ?
-        action = action.squeeze()
-
         x = torch.cat([state, action], 1)
         x = F.relu(self.linear1(x))
         x = F.relu(self.linear2(x))
@@ -82,7 +79,7 @@ class PolicyNetwork(nn.Module):
 class LearnerD3PG(object):
     """Policy and value network update routine. """
 
-    def __init__(self, config, batch_queue):
+    def __init__(self, config, batch_queue, log_dir=''):
         """
         Args:
             config (dict): configuration
@@ -101,6 +98,9 @@ class LearnerD3PG(object):
         self.batch_queue = batch_queue
         self.gamma = config['discount_rate']
         self.tau = config['tau']
+
+        log_path = f"{log_dir}/learner.pkl"
+        self.logger = Logger(log_path)
 
         # Noise process
         env = create_env_wrapper(config)
@@ -126,6 +126,7 @@ class LearnerD3PG(object):
 
     def ddpg_update(self, batch, min_value=-np.inf, max_value=np.inf):
         state, action, reward, next_state, done = batch
+
         state = np.asarray(state)
         action = np.asarray(action)
         reward = np.asarray(reward)
@@ -178,6 +179,9 @@ class LearnerD3PG(object):
                 #print("Continuing as batch queue empty")
                 continue
             batch = list(zip(*self.batch_queue.get()))
+
+            update_time = time.time()
             self.ddpg_update(batch)
+            self.logger.scalar_summary("learner_update_timing", time.time() - update_time)
         print("Exit learner.")
 

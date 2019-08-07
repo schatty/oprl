@@ -88,7 +88,7 @@ class PolicyNetwork(nn.Module):
 class LearnerD4PG(object):
     """Policy and value network update routine. """
 
-    def __init__(self, config, batch_queue):
+    def __init__(self, config, batch_queue, log_dir=''):
         hidden_dim = config['dense_size']
         state_dim = config['state_dims'][0]
         action_dim = config['action_dims'][0]

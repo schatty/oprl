@@ -1,3 +1,4 @@
+from datetime import datetime
 import random
 from multiprocessing import set_start_method
 import torch.multiprocessing as torch_mp
@@ -5,40 +6,18 @@ try:
     set_start_method('spawn')
 except RuntimeError:
     pass
-import gym
-import yaml
+import os
+from shutil import copyfile
 
 from models.utils import create_learner
 from models.agent import Agent
+from utils.utils import read_config
+from utils.reward_plot import plot_rewards
+from utils.logger import Logger
 
 
-def read_config(path):
-    """
-    Return python dict from .yml file.
-
-    Args:
-        path (str): path to the .yml config.
-
-    Returns (dict): configuration object.
-    """
-    with open(path, 'r') as ymlfile:
-        cfg = yaml.load(ymlfile)
-
-    # Load environment from gym to set its params
-    print("env: ", cfg['env'])
-    env = gym.make(cfg['env'])
-    cfg['state_dims'] = env.observation_space.shape
-    cfg['state_bound_low'] = env.observation_space.low
-    cfg['state_bound_high'] = env.observation_space.high
-    cfg['action_dims'] = env.action_space.shape
-    cfg['action_bound_low'] = env.action_space.low
-    cfg['action_bound_high'] = env.action_space.high
-    del env
-
-    return cfg
-
-
-def sampler_worker(config, replay_queue, batch_queue, stop_agent_event):
+def sampler_worker(config, replay_queue, batch_queue, stop_agent_event,
+                   global_episode, log_dir=''):
     """
     Function that transfers replay to the buffer and batches from buffer to the queue.
 
@@ -47,12 +26,18 @@ def sampler_worker(config, replay_queue, batch_queue, stop_agent_event):
         replay_queue:
         batch_queue:
         stop_agent_event:
+        global_episode:
+        log_dir:
 
     Returns:
 
     """
     num_agents = config['num_agents']
     batch_size = config['batch_size']
+
+    # Logger
+    fn = f"{log_dir}/data_struct.pkl"
+    logger = Logger(log_path=fn)
 
     # TODO: Replace with data structure
     replay_buffer = []
@@ -72,15 +57,28 @@ def sampler_worker(config, replay_queue, batch_queue, stop_agent_event):
         elems = [replay_buffer[i] for i in idxes]
         batch_queue.put(elems)
 
+        # Log data structures sizes
+        logger.scalar_summary("global_episode", global_episode.value)
+        logger.scalar_summary("replay_queue", replay_queue.qsize())
+        logger.scalar_summary("batch_queue", batch_queue.qsize())
+
     print("Stop sampler worker.")
 
 
-def train(config):
+def train(config_path, config=None):
 
     # Config
+    if config is None:
+        config = read_config(config_path)
     replay_queue_size = config['replay_queue_size']
     batch_queue_size = config['batch_queue_size']
     n_agents = config['num_agents']
+
+    # Create directory for experiment
+    experiment_dir = f"{config['results_path']}/{datetime.now():%Y-%m-%d_%H:%M:%S}"
+    if not os.path.exists(experiment_dir):
+        os.makedirs(experiment_dir)
+    copyfile(config_path, f"{experiment_dir}/config.yml")
 
     # Data structures
     processes = []
@@ -90,17 +88,23 @@ def train(config):
 
     # Data sampler
     batch_queue = torch_mp.Queue(maxsize=batch_queue_size)
-    p = torch_mp.Process(target=sampler_worker, args=(config, replay_queue, batch_queue, stop_agent_event))
+    p = torch_mp.Process(target=sampler_worker,
+                         args=(config, replay_queue, batch_queue, stop_agent_event,
+                               global_episode, experiment_dir))
     processes.append(p)
 
     # Learner (neural net training process)
-    learner = create_learner(config, batch_queue)
+    learner = create_learner(config, batch_queue, log_dir=experiment_dir)
     p = torch_mp.Process(target=learner.run, args=(stop_agent_event,))
     processes.append(p)
 
     # Agents (exploration processes)
     for i in range(n_agents):
-        agent = Agent(config, actor_learner=learner.target_policy_net, global_episode=global_episode, n_agent=i)
+        agent = Agent(config,
+                      actor_learner=learner.target_policy_net,
+                      global_episode=global_episode,
+                      n_agent=i,
+                      log_dir=experiment_dir)
         p = torch_mp.Process(target=agent.run, args=(replay_queue, stop_agent_event))
         processes.append(p)
 
@@ -109,9 +113,12 @@ def train(config):
     for p in processes:
         p.join()
 
+    # Plot reward from all agents
+    plot_rewards(experiment_dir)
+
     print("End.")
 
 
 if __name__ == "__main__":
-    config = read_config("config.yml")
-    train(config)
+    CONFIG_PATH = "config.yml"
+    train(CONFIG_PATH)
