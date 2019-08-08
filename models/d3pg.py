@@ -5,10 +5,11 @@ import torch.optim as optim
 import torch.nn.functional as F
 import time
 
-from utils.utils import OUNoise, ReplayBuffer
+from utils.utils import OUNoise
+from utils.prioritized_experience_replay import ReplayBuffer
 from env.utils import create_env_wrapper
 from utils.logger import Logger
-
+from utils.reward_plot import plot_rewards
 
 class ValueNetwork(nn.Module):
     """Critic - return Q value from given states and actions. """
@@ -72,7 +73,6 @@ class PolicyNetwork(nn.Module):
     def get_action(self, state):
         state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
         action = self.forward(state)
-        #return action.detach().cpu().numpy().item()
         return action
 
 
@@ -98,6 +98,7 @@ class LearnerD3PG(object):
         self.batch_queue = batch_queue
         self.gamma = config['discount_rate']
         self.tau = config['tau']
+        self.log_dir = log_dir
 
         log_path = f"{log_dir}/learner.pkl"
         self.logger = Logger(log_path)
@@ -125,7 +126,7 @@ class LearnerD3PG(object):
         self.value_criterion = nn.MSELoss()
 
     def ddpg_update(self, batch, min_value=-np.inf, max_value=np.inf):
-        state, action, reward, next_state, done = batch
+        state, action, reward, next_state, done, _ = batch
 
         state = np.asarray(state)
         action = np.asarray(action)
@@ -148,6 +149,7 @@ class LearnerD3PG(object):
 
         value = self.value_net(state, action)
         value_loss = self.value_criterion(value, expected_value.detach())
+        self.logger.scalar_summary("value_loss", value_loss.item())
 
         self.value_optimizer.zero_grad()
         value_loss.backward()
@@ -157,6 +159,7 @@ class LearnerD3PG(object):
 
         policy_loss = self.value_net(state, self.policy_net(state))
         policy_loss = -policy_loss.mean()
+        self.logger.scalar_summary("policy_loss", policy_loss.item())
 
         self.policy_optimizer.zero_grad()
         policy_loss.backward()
@@ -176,12 +179,12 @@ class LearnerD3PG(object):
     def run(self, stop_agent_event):
         while not self.batch_queue.empty() or not stop_agent_event.value:
             if self.batch_queue.empty():
-                #print("Continuing as batch queue empty")
                 continue
-            batch = list(zip(*self.batch_queue.get()))
+            batch = self.batch_queue.get()
 
             update_time = time.time()
             self.ddpg_update(batch)
             self.logger.scalar_summary("learner_update_timing", time.time() - update_time)
-        print("Exit learner.")
 
+        plot_rewards(self.log_dir)
+        print("Exit learner.")
