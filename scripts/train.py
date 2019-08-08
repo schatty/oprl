@@ -1,3 +1,9 @@
+import logging
+import logging.config
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
+logging.getLogger('requests').setLevel(logging.WARNING)
+logging.getLogger('PIL').setLevel(logging.WARNING)
+
 from datetime import datetime
 import random
 from multiprocessing import set_start_method
@@ -17,7 +23,7 @@ from utils.logger import Logger
 
 
 def sampler_worker(config, replay_queue, batch_queue, stop_agent_event,
-                   global_episode, log_dir=''):
+                   global_episode, logger, log_dir=''):
     """
     Function that transfers replay to the buffer and batches from buffer to the queue.
 
@@ -37,7 +43,7 @@ def sampler_worker(config, replay_queue, batch_queue, stop_agent_event,
 
     # Logger
     fn = f"{log_dir}/data_struct.pkl"
-    logger = Logger(log_path=fn)
+    ptlogger = Logger(log_path=fn)
 
     # TODO: Replace with data structure
     replay_buffer = []
@@ -58,11 +64,11 @@ def sampler_worker(config, replay_queue, batch_queue, stop_agent_event,
         batch_queue.put(elems)
 
         # Log data structures sizes
-        logger.scalar_summary("global_episode", global_episode.value)
-        logger.scalar_summary("replay_queue", replay_queue.qsize())
-        logger.scalar_summary("batch_queue", batch_queue.qsize())
+        ptlogger.scalar_summary("global_episode", global_episode.value)
+        ptlogger.scalar_summary("replay_queue", replay_queue.qsize())
+        ptlogger.scalar_summary("batch_queue", batch_queue.qsize())
 
-    print("Stop sampler worker.")
+    logger.info("Stop sampler worker.")
 
 
 def train(config_path, config=None):
@@ -80,6 +86,13 @@ def train(config_path, config=None):
         os.makedirs(experiment_dir)
     copyfile(config_path, f"{experiment_dir}/config.yml")
 
+    # Set logging
+    logging.basicConfig(level=logging.DEBUG,
+                        filename=f'{experiment_dir}/training.log',
+                        format='%(asctime)s %(levelname)s:%(message)s')
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+
     # Data structures
     processes = []
     replay_queue = torch_mp.Queue(maxsize=replay_queue_size)
@@ -90,11 +103,11 @@ def train(config_path, config=None):
     batch_queue = torch_mp.Queue(maxsize=batch_queue_size)
     p = torch_mp.Process(target=sampler_worker,
                          args=(config, replay_queue, batch_queue, stop_agent_event,
-                               global_episode, experiment_dir))
+                               global_episode, logger, experiment_dir))
     processes.append(p)
 
     # Learner (neural net training process)
-    learner = create_learner(config, batch_queue, log_dir=experiment_dir)
+    learner = create_learner(config, batch_queue, global_episode, log_dir=experiment_dir)
     p = torch_mp.Process(target=learner.run, args=(stop_agent_event,))
     processes.append(p)
 
@@ -116,7 +129,7 @@ def train(config_path, config=None):
     # Plot reward from all agents
     plot_rewards(experiment_dir)
 
-    print("End.")
+    logger.info("Training ended.")
 
 
 if __name__ == "__main__":

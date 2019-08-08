@@ -1,5 +1,8 @@
 import tempfile
-import os
+import logging
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
+logging.getLogger('requests').setLevel(logging.WARNING)
+logging.getLogger('PIL').setLevel(logging.WARNING)
 import time
 from collections import deque
 import matplotlib.pyplot as plt
@@ -12,8 +15,7 @@ from utils.logger import Logger
 
 class Agent(object):
 
-    def __init__(self, config, actor_learner, global_episode, n_agent=0, log_dir=''):
-        print(f"Initializing agent {n_agent}...")
+    def __init__(self, config, actor_learner, global_episode, n_agent, log_dir=''):
         self.config = config
         self.n_agent = n_agent
         self.max_steps = config['max_ep_length']
@@ -32,7 +34,7 @@ class Agent(object):
                                   hidden_size=config['dense_size'])
         # Logger
         log_path = f"{log_dir}/agent-{n_agent}.pkl"
-        self.logger = Logger(log_path)
+        self.datalogger = Logger(log_path)
 
     def update_actor_learner(self):
         """Update local actor to the actor from learner. """
@@ -45,18 +47,25 @@ class Agent(object):
         # Initialise deque buffer to store experiences for N-step returns
         self.exp_buffer = deque()
 
+        logging.basicConfig(level=logging.DEBUG,
+                            filename=f'{self.log_dir}/training.log',
+                            format='%(asctime)s %(levelname)s:%(message)s')
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.INFO)
+
         rewards = []
         while not stop_agent_event.value:
+            logger.info(f"Agent {self.n_agent} starts episode {self.local_episode}")
             episode_reward = 0
             self.local_episode += 1
             self.global_episode.value += 1
             self.exp_buffer.clear()
 
             if self.local_episode % 25 == 0:
-                print(f"Agent: {self.n_agent}  episode {self.local_episode}")
+                print(f"Agent: {self.n_agent} episode {self.local_episode}")
             if self.global_episode.value >= self.config['num_episodes_train']:
                 stop_agent_event.value = 1
-                print("Stop agent!")
+                logger.info(f"Agent {self.n_agent}: Exiting")
                 break
 
             ep_start_time = time.time()
@@ -89,15 +98,17 @@ class Agent(object):
                     break
 
             # Log metrics
-            self.logger.scalar_summary("reward", episode_reward)
-            self.logger.scalar_summary("episode_timing", time.time() - ep_start_time)
+            self.datalogger.scalar_summary("episode_local", self.local_episode)
+            self.datalogger.scalar_summary("reward", episode_reward)
+            self.datalogger.scalar_summary("episode_timing", time.time() - ep_start_time)
 
             rewards.append(episode_reward)
             if self.local_episode % self.config['update_agent_ep'] == 0:
-                print("Performing hard update of the local actor to the learner.")
+                msg = f"Agent {self.n_agent}: Hard update to the learner on episode {self.local_episode}."
+                logger.info(msg)
                 self.update_actor_learner()
 
-        print("Emptying replay queue")
+        logger.info(f"Agent {self.n_agent}: emptying replay queue...")
         while not replay_queue.empty():
             replay_queue.get()
 
@@ -105,7 +116,7 @@ class Agent(object):
         if self.n_agent == 0:
             self.save_replay_gif()
 
-        print("Agent done.")
+        logger.info(f"Agent {self.n_agent}: job done.")
 
     def save_replay_gif(self):
         with tempfile.TemporaryDirectory() as tmpdirname:
@@ -122,4 +133,3 @@ class Agent(object):
 
             fn = f"{self.config['env']}-{self.config['model']}-{step}.gif"
             make_gif(tmpdirname, f"{self.log_dir}/{fn}")
-        print("fig saved to ", f"{self.log_dir}/{fn}")

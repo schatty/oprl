@@ -79,7 +79,7 @@ class PolicyNetwork(nn.Module):
 class LearnerD3PG(object):
     """Policy and value network update routine. """
 
-    def __init__(self, config, batch_queue, log_dir=''):
+    def __init__(self, config, batch_queue, global_episode, log_dir=''):
         """
         Args:
             config (dict): configuration
@@ -98,9 +98,10 @@ class LearnerD3PG(object):
         self.batch_queue = batch_queue
         self.gamma = config['discount_rate']
         self.tau = config['tau']
+        self.global_episode = global_episode
 
         log_path = f"{log_dir}/learner.pkl"
-        self.logger = Logger(log_path)
+        self.datalogger = Logger(log_path)
 
         # Noise process
         env = create_env_wrapper(config)
@@ -125,8 +126,10 @@ class LearnerD3PG(object):
         self.value_criterion = nn.MSELoss()
 
     def ddpg_update(self, batch, min_value=-np.inf, max_value=np.inf):
-        state, action, reward, next_state, done = batch
+        self.datalogger.scalar_summary("global_episode", self.global_episode.value)
 
+        # Get transition from batch
+        state, action, reward, next_state, done = batch
         state = np.asarray(state)
         action = np.asarray(action)
         reward = np.asarray(reward)
@@ -152,11 +155,13 @@ class LearnerD3PG(object):
         self.value_optimizer.zero_grad()
         value_loss.backward()
         self.value_optimizer.step()
+        self.datalogger.scalar_summary("value_loss", value_loss.item())
 
         # -------- Update actor --------
 
         policy_loss = self.value_net(state, self.policy_net(state))
         policy_loss = -policy_loss.mean()
+        self.datalogger.scalar_summary("policy_loss", policy_loss.item())
 
         self.policy_optimizer.zero_grad()
         policy_loss.backward()
@@ -176,12 +181,11 @@ class LearnerD3PG(object):
     def run(self, stop_agent_event):
         while not self.batch_queue.empty() or not stop_agent_event.value:
             if self.batch_queue.empty():
-                #print("Continuing as batch queue empty")
                 continue
             batch = list(zip(*self.batch_queue.get()))
 
             update_time = time.time()
             self.ddpg_update(batch)
-            self.logger.scalar_summary("learner_update_timing", time.time() - update_time)
+            self.datalogger.scalar_summary("learner_update_timing", time.time() - update_time)
         print("Exit learner.")
 
