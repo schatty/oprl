@@ -5,7 +5,6 @@ logging.getLogger('requests').setLevel(logging.WARNING)
 logging.getLogger('PIL').setLevel(logging.WARNING)
 
 from datetime import datetime
-import random
 from multiprocessing import set_start_method
 import torch.multiprocessing as torch_mp
 try:
@@ -18,8 +17,8 @@ from shutil import copyfile
 from models.utils import create_learner
 from models.agent import Agent
 from utils.utils import read_config
-from utils.reward_plot import plot_rewards
 from utils.logger import Logger
+from utils.prioritized_experience_replay import create_replay_buffer
 
 
 def sampler_worker(config, replay_queue, batch_queue, stop_agent_event,
@@ -45,8 +44,8 @@ def sampler_worker(config, replay_queue, batch_queue, stop_agent_event,
     fn = f"{log_dir}/data_struct.pkl"
     ptlogger = Logger(log_path=fn)
 
-    # TODO: Replace with data structure
-    replay_buffer = []
+    # Create replay buffer
+    replay_buffer = create_replay_buffer(config)
 
     while not stop_agent_event.value or not replay_queue.empty():
         # (1) Transfer replays to global buffer
@@ -54,14 +53,15 @@ def sampler_worker(config, replay_queue, batch_queue, stop_agent_event,
             if replay_queue.empty():
                 break
             replay = replay_queue.get()
-            replay_buffer.append(replay)
+            replay_buffer.add(*replay)
 
         # (2) Transfer batch of replay from buffer to the batch_queue
+        if stop_agent_event.value:
+            continue
         if len(replay_buffer) < batch_size:
             continue
-        idxes = [random.randint(0, len(replay_buffer) - 1) for _ in range(batch_size)]
-        elems = [replay_buffer[i] for i in idxes]
-        batch_queue.put(elems)
+        batch = replay_buffer.sample(batch_size)
+        batch_queue.put(batch)
 
         # Log data structures sizes
         ptlogger.scalar_summary("global_episode", global_episode.value)
@@ -81,7 +81,7 @@ def train(config_path, config=None):
     n_agents = config['num_agents']
 
     # Create directory for experiment
-    experiment_dir = f"{config['results_path']}/{datetime.now():%Y-%m-%d_%H:%M:%S}"
+    experiment_dir = f"{config['results_path']}/{config['env']}-{config['model']}-{datetime.now():%Y-%m-%d_%H:%M:%S}"
     if not os.path.exists(experiment_dir):
         os.makedirs(experiment_dir)
     copyfile(config_path, f"{experiment_dir}/config.yml")
@@ -125,9 +125,6 @@ def train(config_path, config=None):
         p.start()
     for p in processes:
         p.join()
-
-    # Plot reward from all agents
-    plot_rewards(experiment_dir)
 
     logger.info("Training ended.")
 

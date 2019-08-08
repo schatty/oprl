@@ -30,8 +30,8 @@ def plot_rewards(dirname, figsize=(10, 5), dpi=150):
     # Plot reward from each agent-process
     figure(num=0, figsize=figsize, dpi=dpi, facecolor='w', edgecolor='k')
     sns.set_style('whitegrid')
-    sns.lineplot(data=df, y='reward_0', x='episode')
-    sns.lineplot(data=df, y='reward_1', x='episode')
+    for i in range(len(file_paths)):
+        sns.lineplot(data=df, y=f'reward_{i}', x='episode')
     plt.legend(title='Reward', loc='upper left',
                labels=[f"Process {i}" for i in range(len(files))])
 

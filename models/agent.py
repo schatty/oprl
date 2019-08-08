@@ -1,14 +1,15 @@
-import tempfile
 import logging
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
 logging.getLogger('requests').setLevel(logging.WARNING)
 logging.getLogger('PIL').setLevel(logging.WARNING)
+import shutil
+import os
 import time
 from collections import deque
 import matplotlib.pyplot as plt
 
 from .utils import create_actor
-from utils.utils import OUNoise, ReplayBuffer, make_gif
+from utils.utils import OUNoise, make_gif
 from env.utils import create_env_wrapper
 from utils.logger import Logger
 
@@ -61,8 +62,8 @@ class Agent(object):
             self.global_episode.value += 1
             self.exp_buffer.clear()
 
-            if self.local_episode % 25 == 0:
-                print(f"Agent: {self.n_agent} episode {self.local_episode}")
+            if self.local_episode % 1 == 0:
+                print(f"Agent: {self.n_agent}  episode {self.local_episode}")
             if self.global_episode.value >= self.config['num_episodes_train']:
                 stop_agent_event.value = 1
                 logger.info(f"Agent {self.n_agent}: Exiting")
@@ -89,7 +90,7 @@ class Agent(object):
                         discounted_reward += r_i * gamma
                         gamma *= self.config['discount_rate']
 
-                    replay_queue.put([state_0, action_0, discounted_reward, next_state, done])
+                    replay_queue.put([state_0, action_0, discounted_reward, next_state, done, gamma])
 
                 state = next_state
                 episode_reward += reward
@@ -119,17 +120,22 @@ class Agent(object):
         logger.info(f"Agent {self.n_agent}: job done.")
 
     def save_replay_gif(self):
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            state = self.env_wrapper.reset()
-            for step in range(self.max_steps):
-                action = self.actor.get_action(state)
-                action = self.ou_noise.get_action(action, step)
-                next_state, reward, done = self.env_wrapper.step(action)
-                img = self.env_wrapper.render()
-                plt.imsave(fname=f"{tmpdirname}/{step}.png", arr=img)
-                state = next_state
-                if done:
-                    break
+        dir_name = "replay_render"
+        if not os.path.exists(dir_name):
+            os.makedirs(dir_name)
 
-            fn = f"{self.config['env']}-{self.config['model']}-{step}.gif"
-            make_gif(tmpdirname, f"{self.log_dir}/{fn}")
+        state = self.env_wrapper.reset()
+        for step in range(self.max_steps):
+            action = self.actor.get_action(state)
+            action = self.ou_noise.get_action(action, step)
+            next_state, reward, done = self.env_wrapper.step(action)
+            img = self.env_wrapper.render()
+            plt.imsave(fname=f"{dir_name}/{step}.png", arr=img)
+            state = next_state
+            if done:
+                break
+
+        fn = f"{self.config['env']}-{self.config['model']}-{step}.gif"
+        make_gif(dir_name, f"{self.log_dir}/{fn}")
+        shutil.rmtree(dir_name, ignore_errors=False, onerror=None)
+        print("fig saved to ", f"{self.log_dir}/{fn}")
