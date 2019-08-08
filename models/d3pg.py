@@ -128,10 +128,8 @@ class LearnerD3PG(object):
 
     def ddpg_update(self, batch, min_value=-np.inf, max_value=np.inf):
         self.datalogger.scalar_summary("global_episode", self.global_episode.value)
-        state, action, reward, next_state, done, _ = batch
 
-        # Get transition from batch
-        state, action, reward, next_state, done = batch
+        state, action, reward, next_state, done, _ = batch
         state = np.asarray(state)
         action = np.asarray(action)
         reward = np.asarray(reward)
@@ -153,7 +151,7 @@ class LearnerD3PG(object):
 
         value = self.value_net(state, action)
         value_loss = self.value_criterion(value, expected_value.detach())
-        self.logger.scalar_summary("value_loss", value_loss.item())
+        self.datalogger.scalar_summary("value_loss", value_loss.item())
 
         self.value_optimizer.zero_grad()
         value_loss.backward()
