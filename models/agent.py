@@ -80,7 +80,8 @@ class Agent(object):
                         discounted_reward += r_i * gamma
                         gamma *= self.config['discount_rate']
 
-                    replay_queue.put([state_0, action_0, discounted_reward, next_state, done, gamma])
+                    if not stop_agent_event.value:
+                        replay_queue.put([state_0, action_0, discounted_reward, next_state, done, gamma])
 
                 state = next_state
                 episode_reward += reward

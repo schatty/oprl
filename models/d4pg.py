@@ -92,7 +92,7 @@ class PolicyNetwork(nn.Module):
 class LearnerD4PG(object):
     """Policy and value network update routine. """
 
-    def __init__(self, config, batch_queue, log_dir=''):
+    def __init__(self, config, batch_queue, episode_queue, log_dir=''):
         hidden_dim = config['dense_size']
         state_dim = config['state_dims'][0]
         action_dim = config['action_dims'][0]
@@ -110,6 +110,7 @@ class LearnerD4PG(object):
         self.gamma = config['discount_rate']
         self.batch_queue = batch_queue
         self.log_dir = log_dir
+        self.episode_queue = episode_queue
 
         log_path = f"{log_dir}/learner.pkl"
         self.logger = Logger(log_path)
@@ -137,6 +138,8 @@ class LearnerD4PG(object):
         self.value_criterion = nn.BCEWithLogitsLoss()
 
     def ddpg_update(self, batch, min_value=-np.inf, max_value=np.inf):
+        self.logger.scalar_summary("global_episode", self.episode_queue.value)
+
         state, action, reward, next_state, done, _ = batch
 
         state = np.asarray(state)

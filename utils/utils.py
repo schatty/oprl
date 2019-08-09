@@ -55,6 +55,7 @@ def make_gif(source_dir, output):
     for path in image_paths:
         img = Image.open(path)
         frames.append(img)
+        img.close()
     frames[0].save(output, format='GIF', append_images=frames[1:],
                    save_all=True, duration=15, loop=0)
 

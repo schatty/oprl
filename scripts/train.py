@@ -15,7 +15,7 @@ from utils.logger import Logger
 from utils.prioritized_experience_replay import create_replay_buffer
 
 
-def sampler_worker(config, replay_queue, batch_queue, stop_agent_event,
+def sampler_worker(config, replay_queue, batch_queue, replay_priorities_queue, stop_agent_event,
                    global_episode, log_dir=''):
     """
     Function that transfers replay to the buffer and batches from buffer to the queue.
@@ -27,12 +27,12 @@ def sampler_worker(config, replay_queue, batch_queue, stop_agent_event,
         stop_agent_event:
         global_episode:
         log_dir:
-
-    Returns:
-
     """
     num_agents = config['num_agents']
     batch_size = config['batch_size']
+    priority_beta_start = config['priority_beta_start']
+    num_episodes = config['num_episodes_train']
+    priority_beta_increment = (config['priority_beta_end'] - config['priority_beta_start']) / num_episodes
 
     # Logger
     fn = f"{log_dir}/data_struct.pkl"
@@ -54,7 +54,13 @@ def sampler_worker(config, replay_queue, batch_queue, stop_agent_event,
             continue
         if len(replay_buffer) < batch_size:
             continue
-        batch = replay_buffer.sample(batch_size)
+
+        if not replay_priorities_queue.empty():
+            inds, weights = replay_priorities_queue.get()
+            replay_buffer.update_priorities(inds, weights)
+
+        priority_beta = priority_beta_start + (global_episode.value + 1) * priority_beta_increment
+        batch = replay_buffer.sample(batch_size, beta=priority_beta)
         batch_queue.put(batch)
 
         # Log data structures sizes
@@ -62,6 +68,8 @@ def sampler_worker(config, replay_queue, batch_queue, stop_agent_event,
         logger.scalar_summary("replay_queue", replay_queue.qsize())
         logger.scalar_summary("batch_queue", batch_queue.qsize())
 
+    while not replay_priorities_queue.empty():
+        replay_priorities_queue.get()
     print("Stop sampler worker.")
 
 
@@ -83,19 +91,20 @@ def train(config_path, config=None):
     # Data structures
     processes = []
     replay_queue = torch_mp.Queue(maxsize=replay_queue_size)
+    replay_priorities_queue = torch_mp.Queue(maxsize=batch_queue_size)
     stop_agent_event = torch_mp.Value('i', 0)
     global_episode = torch_mp.Value('i', 0)
 
     # Data sampler
     batch_queue = torch_mp.Queue(maxsize=batch_queue_size)
     p = torch_mp.Process(target=sampler_worker,
-                         args=(config, replay_queue, batch_queue, stop_agent_event,
+                         args=(config, replay_queue, batch_queue, replay_priorities_queue, stop_agent_event,
                                global_episode, experiment_dir))
     processes.append(p)
 
     # Learner (neural net training process)
-    learner = create_learner(config, batch_queue, log_dir=experiment_dir)
-    p = torch_mp.Process(target=learner.run, args=(stop_agent_event,))
+    learner = create_learner(config, batch_queue, global_episode, log_dir=experiment_dir)
+    p = torch_mp.Process(target=learner.run, args=(stop_agent_event, replay_priorities_queue))
     processes.append(p)
 
     # Agents (exploration processes)

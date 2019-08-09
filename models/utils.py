@@ -20,11 +20,11 @@ def create_actor(model_name, num_actions, num_states, hidden_size):
         raise ValueError(f"Unknown model type: {model_name}")
 
 
-def create_learner(config, batch_queue, **kwargs):
+def create_learner(config, batch_queue, global_episode, **kwargs):
     model_name = config["model"].lower()
     if model_name == "d3pg":
-        return LearnerD3PG(config, batch_queue, **kwargs)
+        return LearnerD3PG(config, batch_queue, global_episode, **kwargs)
     elif model_name == "d4pg":
-        return LearnerD4PG(config, batch_queue, **kwargs)
+        return LearnerD4PG(config, batch_queue, global_episode, **kwargs)
     else:
         raise ValueError(f"Unknown model type: {model_name}")

@@ -79,7 +79,7 @@ class PolicyNetwork(nn.Module):
 class LearnerD3PG(object):
     """Policy and value network update routine. """
 
-    def __init__(self, config, batch_queue, log_dir=''):
+    def __init__(self, config, batch_queue, global_episode, log_dir=''):
         """
         Args:
             config (dict): configuration
@@ -99,6 +99,8 @@ class LearnerD3PG(object):
         self.gamma = config['discount_rate']
         self.tau = config['tau']
         self.log_dir = log_dir
+        self.global_episode = global_episode
+        self.prioritized_replay = config['replay_memory_prioritized']
 
         log_path = f"{log_dir}/learner.pkl"
         self.logger = Logger(log_path)
@@ -123,22 +125,27 @@ class LearnerD3PG(object):
         self.value_optimizer = optim.Adam(self.value_net.parameters(), lr=value_lr)
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=policy_lr)
 
-        self.value_criterion = nn.MSELoss()
+        self.value_criterion = nn.MSELoss(reduction='none')
 
-    def ddpg_update(self, batch, min_value=-np.inf, max_value=np.inf):
-        state, action, reward, next_state, done, _ = batch
+    def ddpg_update(self, batch, replay_priority_queue, min_value=-np.inf, max_value=np.inf):
+        self.logger.scalar_summary("global_episode", self.global_episode.value)
+
+        state, action, reward, next_state, done, gammas, weights, inds = batch
 
         state = np.asarray(state)
         action = np.asarray(action)
         reward = np.asarray(reward)
         next_state = np.asarray(next_state)
         done = np.asarray(done)
+        weights = np.asarray(weights)
+        inds = np.asarray(inds)
 
         state = torch.from_numpy(state).float().to(self.device)
         next_state = torch.from_numpy(next_state).float().to(self.device)
         action = torch.from_numpy(action).float().to(self.device)
         reward = torch.from_numpy(reward).float().unsqueeze(1).to(self.device)
         done = torch.from_numpy(done).float().unsqueeze(1).to(self.device)
+        weights = torch.from_numpy(weights).float().unsqueeze(1).to(self.device)
 
         # ------- Update critic -------
 
@@ -149,6 +156,17 @@ class LearnerD3PG(object):
 
         value = self.value_net(state, action)
         value_loss = self.value_criterion(value, expected_value.detach())
+        #print("Value loss: ", value_loss.shape)
+
+        # Update priorities in buffer
+        td_error = value_loss.cpu().detach().numpy()
+        priority_epsilon = 1e-4
+        if self.prioritized_replay:
+            weights = np.abs(td_error) + priority_epsilon
+            replay_priority_queue.put((inds, weights))
+
+        value_loss = value_loss.mean()
+
         self.logger.scalar_summary("value_loss", value_loss.item())
 
         self.value_optimizer.zero_grad()
@@ -176,14 +194,14 @@ class LearnerD3PG(object):
                 target_param.data * (1.0 - self.tau) + param.data * self.tau
             )
 
-    def run(self, stop_agent_event):
+    def run(self, stop_agent_event, replay_priority_queue):
         while not self.batch_queue.empty() or not stop_agent_event.value:
             if self.batch_queue.empty():
                 continue
             batch = self.batch_queue.get()
 
             update_time = time.time()
-            self.ddpg_update(batch)
+            self.ddpg_update(batch, replay_priority_queue)
             self.logger.scalar_summary("learner_update_timing", time.time() - update_time)
 
         plot_rewards(self.log_dir)
