@@ -8,5 +8,4 @@ class TestsPendulumD4PG(unittest.TestCase):
         CONFIG_PATH = "tests/pendulum/config.yml"
         config = read_config(CONFIG_PATH)
         config['model'] = 'd4pg'
-        config['num_agents'] = 1
-        train(CONFIG_PATH, config=config)
+        train(config=config)

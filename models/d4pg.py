@@ -92,24 +92,23 @@ class PolicyNetwork(nn.Module):
 class LearnerD4PG(object):
     """Policy and value network update routine. """
 
-    def __init__(self, config, batch_queue, log_dir=''):
+    def __init__(self, config, log_dir=''):
         hidden_dim = config['dense_size']
-        state_dim = config['state_dims'][0]
-        action_dim = config['action_dims'][0]
+        state_dim = config['state_dims']
+        action_dim = config['action_dims']
         value_lr = config['critic_learning_rate']
         policy_lr = config['actor_learning_rate']
         v_min = config['v_min']
         v_max = config['v_max']
         num_atoms = config['num_atoms']
         self.device = config['device']
-        self.max_frames = config['num_episodes_train']
         self.max_steps = config['max_ep_length']
-        self.frame_idx = 0
+        self.num_train_steps = config['num_steps_train']
         self.batch_size = config['batch_size']
         self.tau = config['tau']
         self.gamma = config['discount_rate']
-        self.batch_queue = batch_queue
         self.log_dir = log_dir
+        self.prioritized_replay = config['replay_memory_prioritized']
 
         log_path = f"{log_dir}/learner.pkl"
         self.logger = Logger(log_path)
@@ -134,16 +133,20 @@ class LearnerD4PG(object):
         self.value_optimizer = optim.Adam(self.value_net.parameters(), lr=value_lr)
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=policy_lr)
 
-        self.value_criterion = nn.BCEWithLogitsLoss()
+        self.value_criterion = nn.BCELoss(reduction='none')#nn.BCEWithLogitsLoss(reduction='none')
 
-    def ddpg_update(self, batch, min_value=-np.inf, max_value=np.inf):
-        state, action, reward, next_state, done, _ = batch
+    def ddpg_update(self, batch, replay_priority_queue, update_step, min_value=-np.inf, max_value=np.inf):
+        self.logger.scalar_summary("update_step", update_step.value)
+
+        state, action, reward, next_state, done, gamma, weights, inds = batch
 
         state = np.asarray(state)
         action = np.asarray(action)
         reward = np.asarray(reward)
         next_state = np.asarray(next_state)
         done = np.asarray(done)
+        weights = np.asarray(weights)
+        inds = np.asarray(inds).flatten()
 
         state = torch.from_numpy(state).float().to(self.device)
         next_state = torch.from_numpy(next_state).float().to(self.device)
@@ -164,6 +167,7 @@ class LearnerD4PG(object):
         target_Z_atoms = np.repeat(np.expand_dims(target_z_atoms, axis=0), self.batch_size,
                                    axis=0)  # [batch_size x n_atoms]
         # Value of terminal states is 0 by definition
+
         target_Z_atoms *= (done.cpu().int().numpy() == 0)
 
         # Apply bellman update to each atom (expected value)
@@ -173,10 +177,21 @@ class LearnerD4PG(object):
                                          target_value.cpu().float(),
                                          torch.from_numpy(self.value_net.z_atoms).cpu().float())
 
-        critic_value = self.value_net(state, action)
+        critic_value = self.value_net.get_probs(state, action)#self.value_net(state, action)
         critic_value = critic_value.to(self.device)
+        print("Target Z projected: ", target_z_projected)
         value_loss = self.value_criterion(critic_value,
                                      torch.autograd.Variable(target_z_projected, requires_grad=False).cuda())
+        value_loss = value_loss.mean(axis=1)
+
+        # Update priorities in buffer
+        td_error = value_loss.cpu().detach().numpy().flatten()
+        priority_epsilon = 1e-4
+        if self.prioritized_replay:
+            weights = np.abs(td_error) + priority_epsilon
+            replay_priority_queue.put((inds, weights))
+
+        value_loss = value_loss.mean()
 
         self.value_optimizer.zero_grad()
         value_loss.backward()
@@ -203,15 +218,20 @@ class LearnerD4PG(object):
                 target_param.data * (1.0 - self.tau) + param.data * self.tau
             )
 
-    def run(self, stop_agent_event):
-        while not self.batch_queue.empty() or not stop_agent_event.value:
-            if self.batch_queue.empty():
+    def run(self, training_on, batch_queue, replay_priority_queue, update_step):
+        while update_step.value < self.num_train_steps:
+            if batch_queue.empty():
                 continue
-            batch = self.batch_queue.get()
+            batch = batch_queue.get()
 
             update_time = time.time()
-            self.ddpg_update(batch)
+            self.ddpg_update(batch, replay_priority_queue, update_step)
             self.logger.scalar_summary("learner_update_timing", time.time() - update_time)
 
+            update_step.value += 1
+            if update_step.value % 50 == 0:
+                print("Training step ", update_step.value)
+
+        training_on.value = 0
         plot_rewards(self.log_dir)
         print("Exit learner.")

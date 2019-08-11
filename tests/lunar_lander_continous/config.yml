@@ -8,7 +8,7 @@ num_agents: 1
 
 model: d3pg
 batch_size: 256
-num_episodes_train: 30 # number of episodes from all agents
+num_episodes_train: 100 # number of episodes from all agents
 max_ep_length: 1000 # maximum number of steps per episode
 replay_mem_size: 1000000 # maximum capacity of replay memory
 priority_alpha: 0.6 # controls the randomness vs prioritisation of the prioritised sampling (0.0 = Uniform sampling, 1.0 = Greedy prioritisation)
@@ -19,7 +19,7 @@ n_step_returns: 5 # number of future steps to collect experiences for N-step ret
 update_agent_ep: 1 # agent gets latest parameters from learner every update_agent_ep episodes
 replay_queue_size: 64 # queue with replays from all the agents
 batch_queue_size: 64 # queue with batches given to learner
-buffer_prioritized: 0 # flag to use prioritized buffer
+replay_memory_prioritized: 0 # flag to use prioritized buffer
 device: cuda
 
 # Network parameters

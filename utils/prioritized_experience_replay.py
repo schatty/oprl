@@ -13,7 +13,7 @@ from utils.segment_tree import SumSegmentTree, MinSegmentTree
 class ReplayBuffer(object):
     def __init__(self, size):
         """
-        Cretate replay buffer.
+        Create replay buffer.
         Args:
             size (int): max number of transitions to store in the buffer. When the buffer
             overflows the old memories are dropped.
@@ -47,10 +47,10 @@ class ReplayBuffer(object):
             obses_tp1.append(np.array(obs_tp1, copy=False))
             dones.append(done)
             gammas.append(gamma)
-        return np.array(obses_t), np.array(actions), np.array(rewards), np.array(obses_tp1), np.array(dones), np.array(
-            gammas)
+        return [np.array(obses_t), np.array(actions), np.array(rewards), np.array(obses_tp1), np.array(dones), np.array(
+            gammas)]
 
-    def sample(self, batch_size):
+    def sample(self, batch_size, **kwags):
         """Sample a batch of experiences.
         Parameters
         ----------
@@ -73,7 +73,9 @@ class ReplayBuffer(object):
             product of gammas for N-step returns
         """
         idxes = [random.randint(0, len(self._storage) - 1) for _ in range(batch_size)]
-        return self._encode_sample(idxes)
+        weights = np.zeros(len(idxes))
+        inds = np.zeros(len(idxes))
+        return self._encode_sample(idxes) + [weights, inds]
 
 
 class PrioritizedReplayBuffer(ReplayBuffer):
@@ -201,7 +203,7 @@ class PrioritizedReplayBuffer(ReplayBuffer):
 
 def create_replay_buffer(config):
     size = config['replay_mem_size']
-    if config['buffer_prioritized']:
-        alpha = config['buffer_alpha']
-        return None
+    if config['replay_memory_prioritized']:
+        alpha = config['priority_alpha']
+        return PrioritizedReplayBuffer(size=size, alpha=alpha)
     return ReplayBuffer(size)

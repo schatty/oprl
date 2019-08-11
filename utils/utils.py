@@ -1,7 +1,7 @@
 import random
 import numpy as np
 import gym
-from PIL import Image
+import imageio
 from glob import glob
 import os
 import yaml
@@ -31,12 +31,7 @@ class OUNoise(object):
     def get_action(self, action, t=0):
         ou_state = self.evolve_state()
         self.sigma = self.max_sigma - (self.max_sigma - self.min_sigma) * min(1.0, t/self.decay_period)
-
-        #ou_state = ou_state.detach().numpy()
         action = action.cpu().detach().numpy()
-
-        #print("action: ", action.shape, type(action))
-        #print("ou_state: ", ou_state.shape, type(action))
         return np.clip(action + ou_state, self.low, self.high)
 
 
@@ -51,12 +46,11 @@ def make_gif(source_dir, output):
     batch_sort = lambda s: int(s[s.rfind('/')+1:s.rfind('.')])
     image_paths = sorted(glob(os.path.join(source_dir, "*.png")),
                          key=batch_sort)
-    frames = []
-    for path in image_paths:
-        img = Image.open(path)
-        frames.append(img)
-    frames[0].save(output, format='GIF', append_images=frames[1:],
-                   save_all=True, duration=15, loop=0)
+
+    images = []
+    for filename in image_paths:
+        images.append(imageio.imread(filename))
+    imageio.mimsave(output, images)
 
 
 def read_config(path):
@@ -72,12 +66,11 @@ def read_config(path):
         cfg = yaml.load(ymlfile)
 
     # Load environment from gym to set its params
-    print("env: ", cfg['env'])
     env = gym.make(cfg['env'])
-    cfg['state_dims'] = env.observation_space.shape
+    cfg['state_dims'] = env.observation_space.shape[0]
     cfg['state_bound_low'] = env.observation_space.low
     cfg['state_bound_high'] = env.observation_space.high
-    cfg['action_dims'] = env.action_space.shape
+    cfg['action_dims'] = env.action_space.shape[0]
     cfg['action_bound_low'] = env.action_space.low
     cfg['action_bound_high'] = env.action_space.high
     del env

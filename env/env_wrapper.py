@@ -15,6 +15,7 @@ class EnvWrapper:
         return action
 
     def step(self, action):
+        #print("action: ", type(action), action.ravel().shape)
         next_state, reward, terminal, _ = self.env.step(action.ravel())
         return next_state, reward, terminal
 

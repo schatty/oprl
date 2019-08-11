@@ -1,12 +1,9 @@
-import logging
-logging.getLogger('matplotlib').setLevel(logging.WARNING)
-logging.getLogger('requests').setLevel(logging.WARNING)
-logging.getLogger('PIL').setLevel(logging.WARNING)
 import shutil
 import os
 import time
 from collections import deque
 import matplotlib.pyplot as plt
+from torch.multiprocessing import queue
 
 from .utils import create_actor
 from utils.utils import OUNoise, make_gif
@@ -16,7 +13,8 @@ from utils.logger import Logger
 
 class Agent(object):
 
-    def __init__(self, config, actor_learner, global_episode, n_agent, log_dir=''):
+    def __init__(self, config, actor_learner, global_episode, n_agent=0, log_dir=''):
+        print(f"Initializing agent {n_agent}...")
         self.config = config
         self.n_agent = n_agent
         self.max_steps = config['max_ep_length']
@@ -27,15 +25,16 @@ class Agent(object):
         # Create environment
         self.env_wrapper = create_env_wrapper(config)
         self.ou_noise = OUNoise(self.env_wrapper.get_action_space())
+        self.ou_noise.reset()
 
         self.actor_learner = actor_learner
         self.actor = create_actor(model_name=config['model'],
-                                  num_actions=config['action_dims'][0],
-                                  num_states=config['state_dims'][0],
+                                  num_actions=config['action_dims'],
+                                  num_states=config['state_dims'],
                                   hidden_size=config['dense_size'])
         # Logger
         log_path = f"{log_dir}/agent-{n_agent}.pkl"
-        self.datalogger = Logger(log_path)
+        self.logger = Logger(log_path)
 
     def update_actor_learner(self):
         """Update local actor to the actor from learner. """
@@ -44,30 +43,19 @@ class Agent(object):
         for target_param, param in zip(target.parameters(), source.parameters()):
             target_param.data.copy_(param.data)
 
-    def run(self, replay_queue, stop_agent_event):
+    def run(self, training_on, replay_queue, update_step):
         # Initialise deque buffer to store experiences for N-step returns
         self.exp_buffer = deque()
 
-        logging.basicConfig(level=logging.DEBUG,
-                            filename=f'{self.log_dir}/training.log',
-                            format='%(asctime)s %(levelname)s:%(message)s')
-        logger = logging.getLogger(__name__)
-        logger.setLevel(logging.INFO)
-
         rewards = []
-        while not stop_agent_event.value:
-            logger.info(f"Agent {self.n_agent} starts episode {self.local_episode}")
+        while training_on.value:
             episode_reward = 0
             self.local_episode += 1
             self.global_episode.value += 1
             self.exp_buffer.clear()
 
-            if self.local_episode % 1 == 0:
+            if self.local_episode % 100 == 0:
                 print(f"Agent: {self.n_agent}  episode {self.local_episode}")
-            if self.global_episode.value >= self.config['num_episodes_train']:
-                stop_agent_event.value = 1
-                logger.info(f"Agent {self.n_agent}: Exiting")
-                break
 
             ep_start_time = time.time()
             state = self.env_wrapper.reset()
@@ -90,8 +78,7 @@ class Agent(object):
                         discounted_reward += r_i * gamma
                         gamma *= self.config['discount_rate']
 
-                    # TODO: looks nasty
-                    if not stop_agent_event.value:
+                    if not replay_queue.full():
                         replay_queue.put([state_0, action_0, discounted_reward, next_state, done, gamma])
 
                 state = next_state
@@ -101,17 +88,15 @@ class Agent(object):
                     break
 
             # Log metrics
-            self.datalogger.scalar_summary("episode_local", self.local_episode)
-            self.datalogger.scalar_summary("reward", episode_reward)
-            self.datalogger.scalar_summary("episode_timing", time.time() - ep_start_time)
+            self.logger.scalar_summary("update_step", update_step.value)
+            self.logger.scalar_summary("reward", episode_reward)
+            self.logger.scalar_summary("episode_timing", time.time() - ep_start_time)
 
             rewards.append(episode_reward)
             if self.local_episode % self.config['update_agent_ep'] == 0:
-                msg = f"Agent {self.n_agent}: Hard update to the learner on episode {self.local_episode}."
-                logger.info(msg)
                 self.update_actor_learner()
 
-        logger.info(f"Agent {self.n_agent}: emptying replay queue...")
+        print("Emptying replay queue")
         while not replay_queue.empty():
             replay_queue.get()
 
@@ -119,7 +104,7 @@ class Agent(object):
         if self.n_agent == 0:
             self.save_replay_gif()
 
-        logger.info(f"Agent {self.n_agent}: job done.")
+        print(f"Agent {self.n_agent} done.")
 
     def save_replay_gif(self):
         dir_name = "replay_render"
@@ -129,7 +114,7 @@ class Agent(object):
         state = self.env_wrapper.reset()
         for step in range(self.max_steps):
             action = self.actor.get_action(state)
-            action = self.ou_noise.get_action(action, step)
+            action = action.cpu().detach().numpy()
             next_state, reward, done = self.env_wrapper.step(action)
             img = self.env_wrapper.render()
             plt.imsave(fname=f"{dir_name}/{step}.png", arr=img)
