@@ -1,11 +1,5 @@
-import random
-import gym
-import numpy as np
-import matplotlib.pyplot as plt
-
 from .d3pg import PolicyNetwork as PolicyNetworkDDPG
 from .d4pg import PolicyNetwork as PolicyNetworkD4PG
-
 from .d3pg import LearnerD3PG
 from .d4pg import LearnerD4PG
 

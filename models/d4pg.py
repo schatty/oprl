@@ -133,7 +133,7 @@ class LearnerD4PG(object):
         self.value_optimizer = optim.Adam(self.value_net.parameters(), lr=value_lr)
         self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=policy_lr)
 
-        self.value_criterion = nn.BCELoss(reduction='none')#nn.BCEWithLogitsLoss(reduction='none')
+        self.value_criterion = nn.BCELoss(reduction='none')
 
     def ddpg_update(self, batch, replay_priority_queue, update_step, min_value=-np.inf, max_value=np.inf):
         self.logger.scalar_summary("update_step", update_step.value)
@@ -172,28 +172,17 @@ class LearnerD4PG(object):
 
         # Apply bellman update to each atom (expected value)
         reward = reward.cpu().float().numpy()
-        #print("Rewards batch: ", reward)
         target_Z_atoms = reward + (target_Z_atoms * self.gamma)
-        #print("proj (1): ", target_Z_atoms)
-        #print("proj (2): ", target_value)
-        #print("proj (3): ", self.value_net.z_atoms)
         target_z_projected = _l2_project(torch.from_numpy(target_Z_atoms).cpu().float(),
                                          target_value.cpu().float(),
                                          torch.from_numpy(self.value_net.z_atoms).cpu().float())
-        #print("Target Z projected: ", target_z_projected)
 
         critic_value = self.value_net.get_probs(state, action)#self.value_net(state, action)
-        #critic_value = self.value_net(state, action)
 
         critic_value = critic_value.to(self.device)
 
-        #target_z_projected = torch.nn.Softmax(dim=1)(target_z_projected)
-        #print("target_z_projected shape: ", target_z_projected.shape)
         value_loss = self.value_criterion(critic_value,
                                      torch.autograd.Variable(target_z_projected, requires_grad=False).cuda())
-
-        #value_loss = torch.sum(-target_z_projected.cuda() * F.log_softmax(critic_value, -1), dim=-1)
-        #print("Value loss shape: ", value_loss.shape)
 
         value_loss = value_loss.mean(axis=1)
 
@@ -207,7 +196,6 @@ class LearnerD4PG(object):
             value_loss = value_loss * torch.tensor(weights).cuda().float()
 
         value_loss = value_loss.mean()
-        #print("TD error: ", value_loss.item())
 
         self.value_optimizer.zero_grad()
         value_loss.backward()

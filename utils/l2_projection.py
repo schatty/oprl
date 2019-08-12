@@ -1,3 +1,7 @@
+## l2_projection ##
+# Adapted for PyTorch from: https://github.com/deepmind/trfl/blob/master/trfl/dist_value_ops.py
+# Projects the target distribution onto the support of the original network [Vmin, Vmax]
+
 import torch
 
 

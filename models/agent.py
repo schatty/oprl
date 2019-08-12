@@ -122,7 +122,6 @@ class Agent(object):
             if self.local_episode % self.config['update_agent_ep'] == 0:
                 self.update_actor_learner()
 
-        print("Emptying replay queue")
         while not replay_queue.empty():
             replay_queue.get()
 

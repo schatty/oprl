@@ -51,7 +51,7 @@ class PolicyNetwork(nn.Module):
             num_states (int): state dimension
             num_actions (action): action dimension
             hidden_size (int): hidden size dimension
-            init_w:
+            init_w (float): margins of initialization
         """
         super(PolicyNetwork, self).__init__()
         self.device = device
@@ -166,7 +166,6 @@ class LearnerD3PG(object):
 
         value = self.value_net(state, action)
         value_loss = self.value_criterion(value, expected_value.detach())
-        #print("Value loss: ", value_loss.shape)
 
         # Update priorities in buffer
         td_error = value_loss.cpu().detach().numpy()
