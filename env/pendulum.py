@@ -1,3 +1,4 @@
+import numpy as np
 from .env_wrapper import EnvWrapper
 
 
@@ -25,7 +26,7 @@ class PendulumWrapper(EnvWrapper):
         # Min reward occurs at max angle (theta_max), max rotational velocity (theta_dot_max) and max effort (action_max) - approx -16.27
 
     def normalise_state(self, state):
-        return state
+        return state#state/np.array([1., 1., 8.])
 
     def normalise_reward(self, reward):
-        return reward
+        return reward/100.0

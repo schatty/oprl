@@ -61,12 +61,17 @@ def sampler_worker(config, replay_queue, batch_queue, replay_priorities_queue, t
             continue
 
         if not replay_priorities_queue.empty():
+            print("Updating priority queue")
             inds, weights = replay_priorities_queue.get()
             replay_buffer.update_priorities(inds, weights)
 
-        priority_beta = priority_beta_start + (update_step.value + 1) * priority_beta_increment
-        batch = replay_buffer.sample(batch_size, beta=priority_beta)
-        batch_queue.put(batch)
+        if not batch_queue.full():
+            priority_beta = priority_beta_start + (update_step.value + 1) * priority_beta_increment
+            batch = replay_buffer.sample(batch_size, beta=priority_beta)
+            batch_queue.put(batch)
+
+        if update_step.value % 1000 == 0:
+            print("Step: ", update_step.value, " buffer: ", len(replay_buffer))
 
         # Log data structures sizes
         logger.scalar_summary("global_episode", global_episode.value)
@@ -101,8 +106,8 @@ def train(config):
 
     # Data structures
     processes = []
-    replay_queue = torch_mp.Queue(maxsize=replay_queue_size)
-    replay_priorities_queue = torch_mp.Queue(maxsize=batch_queue_size)
+    replay_queue = torch_mp.Queue(maxsize=1024)#maxsize=replay_queue_size)
+    replay_priorities_queue = torch_mp.Queue(maxsize=1024)#maxsize=batch_queue_size)
     training_on = torch_mp.Value('i', 1)
     update_step = torch_mp.Value('i', 0)
     global_episode = torch_mp.Value('i', 0)

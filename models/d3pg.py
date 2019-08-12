@@ -24,6 +24,7 @@ class ValueNetwork(nn.Module):
         """
         super(ValueNetwork, self).__init__()
 
+        self.bn1 = nn.BatchNorm1d(num_actions + num_states)
         self.linear1 = nn.Linear(num_states + num_actions, hidden_size)
         self.linear2 = nn.Linear(hidden_size, hidden_size)
         self.linear3 = nn.Linear(hidden_size, 1)
@@ -68,6 +69,9 @@ class PolicyNetwork(nn.Module):
         x = F.relu(self.linear1(state))
         x = F.relu(self.linear2(x))
         x = F.tanh(self.linear3(x))
+
+        x = 0.5 * x * (2 - (-2))
+
         return x
 
     def get_action(self, state):

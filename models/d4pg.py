@@ -48,7 +48,7 @@ class ValueNetwork(nn.Module):
         return x
 
     def get_probs(self, state, action):
-        return F.softmax(self.forward(state, action))
+        return F.softmax(self.forward(state, action), dim=1)
 
 
 class PolicyNetwork(nn.Module):
@@ -172,26 +172,41 @@ class LearnerD4PG(object):
 
         # Apply bellman update to each atom (expected value)
         reward = reward.cpu().float().numpy()
+        #print("Rewards batch: ", reward)
         target_Z_atoms = reward + (target_Z_atoms * self.gamma)
+        #print("proj (1): ", target_Z_atoms)
+        #print("proj (2): ", target_value)
+        #print("proj (3): ", self.value_net.z_atoms)
         target_z_projected = _l2_project(torch.from_numpy(target_Z_atoms).cpu().float(),
                                          target_value.cpu().float(),
                                          torch.from_numpy(self.value_net.z_atoms).cpu().float())
+        #print("Target Z projected: ", target_z_projected)
 
         critic_value = self.value_net.get_probs(state, action)#self.value_net(state, action)
+        #critic_value = self.value_net(state, action)
+
         critic_value = critic_value.to(self.device)
-        print("Target Z projected: ", target_z_projected)
+
+        #target_z_projected = torch.nn.Softmax(dim=1)(target_z_projected)
+        #print("target_z_projected shape: ", target_z_projected.shape)
         value_loss = self.value_criterion(critic_value,
                                      torch.autograd.Variable(target_z_projected, requires_grad=False).cuda())
-        value_loss = value_loss.mean(axis=1)
+
+        #value_loss = torch.sum(-target_z_projected.cuda() * F.log_softmax(critic_value, -1), dim=-1)
+        #print("Value loss shape: ", value_loss.shape)
+
+        #value_loss = value_loss.mean(axis=1)
 
         # Update priorities in buffer
         td_error = value_loss.cpu().detach().numpy().flatten()
+
         priority_epsilon = 1e-4
         if self.prioritized_replay:
             weights = np.abs(td_error) + priority_epsilon
             replay_priority_queue.put((inds, weights))
 
         value_loss = value_loss.mean()
+        #print("TD error: ", value_loss.item())
 
         self.value_optimizer.zero_grad()
         value_loss.backward()
@@ -200,7 +215,9 @@ class LearnerD4PG(object):
 
         # -------- Update actor -----------
 
-        policy_loss = self.value_net(state, self.policy_net(state))
+        policy_loss = self.value_net.get_probs(state, self.policy_net(state))
+        policy_loss = policy_loss * torch.tensor(self.value_net.z_atoms).float().cuda()
+        policy_loss = torch.sum(policy_loss, dim=1)
         policy_loss = -policy_loss.mean()
         self.logger.scalar_summary("policy_loss", policy_loss.item())
 

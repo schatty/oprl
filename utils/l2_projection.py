@@ -46,4 +46,4 @@ def _l2_project(z_p, p, z_q):
 
     delta_hat = (d_sign * delta_qp * d_pos) - ((1. - d_sign) * delta_qp * d_neg)
     p = p[:, None, :]
-    return torch.sum(torch.clamp(1.-delta_hat, 0., 1.) * p, -1)
+    return torch.sum(torch.clamp(1. - delta_hat, 0., 1.) * p, -1)

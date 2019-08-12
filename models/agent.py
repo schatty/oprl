@@ -32,6 +32,8 @@ class Agent(object):
                                   num_actions=config['action_dims'],
                                   num_states=config['state_dims'],
                                   hidden_size=config['dense_size'])
+        self.actor.eval()
+
         # Logger
         log_path = f"{log_dir}/agent-{n_agent}.pkl"
         self.logger = Logger(log_path)
@@ -50,6 +52,7 @@ class Agent(object):
         rewards = []
         while training_on.value:
             episode_reward = 0
+            num_steps = 0
             self.local_episode += 1
             self.global_episode.value += 1
             self.exp_buffer.clear()
@@ -60,11 +63,17 @@ class Agent(object):
             ep_start_time = time.time()
             state = self.env_wrapper.reset()
             self.ou_noise.reset()
-            for step in range(self.max_steps):
+            done = False
+            while not done:
                 action = self.actor.get_action(state)
-                action = self.ou_noise.get_action(action, step)
+                action = self.ou_noise.get_action(action, num_steps)
                 action = action.squeeze(0)
                 next_state, reward, done = self.env_wrapper.step(action)
+
+                episode_reward += reward
+
+                state = self.env_wrapper.normalise_state(state)
+                reward = self.env_wrapper.normalise_reward(reward)
 
                 self.exp_buffer.append((state, action, reward))
 
@@ -80,12 +89,26 @@ class Agent(object):
 
                     if not replay_queue.full():
                         replay_queue.put([state_0, action_0, discounted_reward, next_state, done, gamma])
+                    #else:
+                    #    print("QUEUE IS FULL! ", update_step.value)
 
                 state = next_state
-                episode_reward += reward
 
-                if done:
+                if done or num_steps == self.max_steps:
+                    # Compute Bellman rewards and add experiences to replay memory for the last N-1 experiences still remaining in the experience buffer
+                    while len(self.exp_buffer) != 0:
+                        state_0, action_0, reward_0 = self.exp_buffer.popleft()
+                        discounted_reward = reward_0
+                        gamma = self.config['discount_rate']
+                        for (_, _, r_i) in self.exp_buffer:
+                            discounted_reward += r_i * gamma
+                            gamma *= self.config['discount_rate']
+
+                        # If learner is requesting a pause (to remove samples from PER), wait before adding more samples
+                        replay_queue.put([state_0, action_0, discounted_reward, next_state, done, gamma])
                     break
+
+                num_steps += 1
 
             # Log metrics
             self.logger.scalar_summary("update_step", update_step.value)
