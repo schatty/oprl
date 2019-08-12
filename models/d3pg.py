@@ -45,7 +45,7 @@ class ValueNetwork(nn.Module):
 class PolicyNetwork(nn.Module):
     """Actor - return action value given states. """
 
-    def __init__(self, num_states, num_actions, hidden_size, init_w=3e-3, device='cuda'):
+    def __init__(self, num_states, num_actions, hidden_size, init_w=3e-3, device='cuda', action_func=None):
         """
         Args:
             num_states (int): state dimension
@@ -55,6 +55,7 @@ class PolicyNetwork(nn.Module):
         """
         super(PolicyNetwork, self).__init__()
         self.device = device
+        self.action_func = action_func
 
         self.linear1 = nn.Linear(num_states, hidden_size)
         self.linear2 = nn.Linear(hidden_size, hidden_size)
@@ -70,7 +71,8 @@ class PolicyNetwork(nn.Module):
         x = F.relu(self.linear2(x))
         x = F.tanh(self.linear3(x))
 
-        x = 0.5 * x * (2 - (-2))
+        if self.action_func is not None:
+            x = self.action_func(x)
 
         return x
 
@@ -112,11 +114,17 @@ class LearnerD3PG(object):
         self.ou_noise = OUNoise(env.get_action_space())
         del env
 
+        # Action transformation
+        action_func = None
+        if config['env'].lower() == 'pendulum-v0':
+            def pendulum_action_func(x): return x * 2
+            action_func = pendulum_action_func
+
         # Value and policy nets
         self.value_net = ValueNetwork(state_dim, action_dim, hidden_dim, device=self.device)
-        self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim, device=self.device)
+        self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim, device=self.device, action_func=action_func)
         self.target_value_net = ValueNetwork(state_dim, action_dim, hidden_dim, device=self.device)
-        self.target_policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim, device=self.device)
+        self.target_policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim, device=self.device, action_func=action_func)
 
         for target_param, param in zip(self.target_value_net.parameters(), self.value_net.parameters()):
             target_param.data.copy_(param.data)

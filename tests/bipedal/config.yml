@@ -2,13 +2,13 @@
 
 env: BipedalWalker-v2
 random_seed: 2019
-num_agents: 2
+num_agents: 4
 
 # Training parameters
 
 model: d3pg
 batch_size: 256
-num_episodes_train: 500 # number of episodes from all agents
+num_steps_train: 25000 # number of episodes from all agents
 max_ep_length: 1000 # maximum number of steps per episode
 replay_mem_size: 1000000 # maximum capacity of replay memory
 priority_alpha: 0.6 # controls the randomness vs prioritisation of the prioritised sampling (0.0 = Uniform sampling, 1.0 = Greedy prioritisation)
@@ -21,6 +21,7 @@ replay_queue_size: 64 # queue with replays from all the agents
 batch_queue_size: 64 # queue with batches given to learner
 replay_memory_prioritized: 0 # flag to use prioritized buffer
 device: cuda
+num_episode_save: 500
 
 # Network parameters
 
@@ -29,8 +30,8 @@ actor_learning_rate: 0.0005
 dense_size: 300 # size of the 2 hidden layers in networks
 final_layer_init: 0.003
 num_atoms: 51 # number of atoms in output layer of distributed critic
-v_min: -20.0 # lower bound of critic value output distribution
-v_max: 0.0 # upper bound of critic value output distribution
+v_min: -100.0 # lower bound of critic value output distribution
+v_max: 300.0 # upper bound of critic value output distribution
 tau: 0.01 # parameter for soft target network updates
 
 # Miscellaneous

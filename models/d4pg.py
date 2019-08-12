@@ -195,15 +195,16 @@ class LearnerD4PG(object):
         #value_loss = torch.sum(-target_z_projected.cuda() * F.log_softmax(critic_value, -1), dim=-1)
         #print("Value loss shape: ", value_loss.shape)
 
-        #value_loss = value_loss.mean(axis=1)
+        value_loss = value_loss.mean(axis=1)
 
         # Update priorities in buffer
         td_error = value_loss.cpu().detach().numpy().flatten()
 
         priority_epsilon = 1e-4
         if self.prioritized_replay:
-            weights = np.abs(td_error) + priority_epsilon
-            replay_priority_queue.put((inds, weights))
+            weights_update = np.abs(td_error) + priority_epsilon
+            replay_priority_queue.put((inds, weights_update))
+            value_loss = value_loss * torch.tensor(weights).cuda().float()
 
         value_loss = value_loss.mean()
         #print("TD error: ", value_loss.item())

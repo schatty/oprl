@@ -44,10 +44,6 @@ def sampler_worker(config, replay_queue, batch_queue, replay_priorities_queue, t
 
     while training_on.value or not replay_queue.empty():
         # (1) Transfer replays to global buffer
-        #for _ in range(num_agents):
-        #    if not replay_queue.empty():
-        #        replay = replay_queue.get()
-        #        replay_buffer.add(*replay)
         n = replay_queue.qsize()
         for _ in range(n):
             replay = replay_queue.get()
@@ -61,7 +57,6 @@ def sampler_worker(config, replay_queue, batch_queue, replay_priorities_queue, t
             continue
 
         if not replay_priorities_queue.empty():
-            print("Updating priority queue")
             inds, weights = replay_priorities_queue.get()
             replay_buffer.update_priorities(inds, weights)
 
@@ -78,7 +73,6 @@ def sampler_worker(config, replay_queue, batch_queue, replay_priorities_queue, t
         logger.scalar_summary("replay_queue", replay_queue.qsize())
         logger.scalar_summary("batch_queue", batch_queue.qsize())
         logger.scalar_summary("replay_buffer", len(replay_buffer))
-
 
     while not replay_priorities_queue.empty():
         replay_priorities_queue.get()

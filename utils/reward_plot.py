@@ -14,11 +14,13 @@ def plot_rewards(dirname, figsize=(10, 5), dpi=150):
         dirname (str): directory with .pkl logs.
     """
     # Read pickle logs
-    file_paths = glob(f"{dirname}/*agent*")
+    file_paths = glob(f"{dirname}/*agent*.pkl")
     files = []
     for fp in file_paths:
         with open(fp, 'rb') as f:
-            files.append(pickle.load(f))
+            unpickler = pickle.Unpickler(f)
+            data = unpickler.load()
+            files.append(data)
 
     # Create dataframe
     reward_index = files[0]['tasks'].index('reward')

@@ -2,17 +2,17 @@ import unittest
 from scripts.train import train, read_config
 
 
-class TestsLunarLanderContinousD3PG(unittest.TestCase):
+class TestsLunarLanderContinousD4PG(unittest.TestCase):
 
-    def test_d3pg_train(self):
+    def test_d4pg_train(self):
         CONFIG_PATH = 'tests/lunar_lander_continous/config.yml'
         config = read_config(CONFIG_PATH)
-        config['model'] = 'd3pg'
-        train(CONFIG_PATH)
+        config['model'] = 'd4pg'
+        train(config)
 
-    def test_d3pg_train_prioritized(self):
+    def test_d4pg_train_prioritized(self):
         CONFIG_PATH = 'tests/lunar_lander_continous/config.yml'
         config = read_config(CONFIG_PATH)
-        config['model'] = 'd3pg'
+        config['model'] = 'd4pg'
         config['replay_memory_prioritized'] = 1
-        train(CONFIG_PATH)
+        train(config)

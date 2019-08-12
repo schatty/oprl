@@ -3,7 +3,7 @@ import os
 import time
 from collections import deque
 import matplotlib.pyplot as plt
-from torch.multiprocessing import queue
+import torch
 
 from .utils import create_actor
 from utils.utils import OUNoise, make_gif
@@ -18,6 +18,7 @@ class Agent(object):
         self.config = config
         self.n_agent = n_agent
         self.max_steps = config['max_ep_length']
+        self.num_episode_save = config['num_episode_save']
         self.global_episode = global_episode
         self.local_episode = 0
         self.log_dir = log_dir
@@ -49,6 +50,7 @@ class Agent(object):
         # Initialise deque buffer to store experiences for N-step returns
         self.exp_buffer = deque()
 
+        best_reward = -float("inf")
         rewards = []
         while training_on.value:
             episode_reward = 0
@@ -86,16 +88,13 @@ class Agent(object):
                     for (_, _, r_i) in self.exp_buffer:
                         discounted_reward += r_i * gamma
                         gamma *= self.config['discount_rate']
-
                     if not replay_queue.full():
                         replay_queue.put([state_0, action_0, discounted_reward, next_state, done, gamma])
-                    #else:
-                    #    print("QUEUE IS FULL! ", update_step.value)
 
                 state = next_state
 
                 if done or num_steps == self.max_steps:
-                    # Compute Bellman rewards and add experiences to replay memory for the last N-1 experiences still remaining in the experience buffer
+                    # add rest of experiences remaining in buffer
                     while len(self.exp_buffer) != 0:
                         state_0, action_0, reward_0 = self.exp_buffer.popleft()
                         discounted_reward = reward_0
@@ -103,8 +102,6 @@ class Agent(object):
                         for (_, _, r_i) in self.exp_buffer:
                             discounted_reward += r_i * gamma
                             gamma *= self.config['discount_rate']
-
-                        # If learner is requesting a pause (to remove samples from PER), wait before adding more samples
                         replay_queue.put([state_0, action_0, discounted_reward, next_state, done, gamma])
                     break
 
@@ -114,6 +111,12 @@ class Agent(object):
             self.logger.scalar_summary("update_step", update_step.value)
             self.logger.scalar_summary("reward", episode_reward)
             self.logger.scalar_summary("episode_timing", time.time() - ep_start_time)
+
+            # Saving agent
+            if self.local_episode % self.num_episode_save == 0 or episode_reward > best_reward:
+                if episode_reward > best_reward:
+                    best_reward = episode_reward
+                self.save(f"local_episode_{self.local_episode}_reward_{best_reward:4f}")
 
             rewards.append(episode_reward)
             if self.local_episode % self.config['update_agent_ep'] == 0:
@@ -128,6 +131,13 @@ class Agent(object):
             self.save_replay_gif()
 
         print(f"Agent {self.n_agent} done.")
+
+    def save(self, checkpoint_name):
+        process_dir = f"{self.log_dir}/agent_{self.n_agent}"
+        if not os.path.exists(process_dir):
+            os.makedirs(process_dir)
+        model_fn = f"{process_dir}/{checkpoint_name}.pt"
+        torch.save(self.actor, model_fn)
 
     def save_replay_gif(self):
         dir_name = "replay_render"
