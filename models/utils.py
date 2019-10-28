@@ -14,11 +14,11 @@ def create_actor(model_name, num_actions, num_states, hidden_size):
         raise ValueError(f"Unknown model type: {model_name}")
 
 
-def create_learner(config, **kwargs):
+def create_learner(config, target_policy_net, learner_w_queue, **kwargs):
     model_name = config["model"].lower()
     if model_name == "d3pg":
         return LearnerD3PG(config, **kwargs)
     elif model_name == "d4pg":
-        return LearnerD4PG(config, **kwargs)
+        return LearnerD4PG(config, target_policy_net, learner_w_queue, **kwargs)
     else:
         raise ValueError(f"Unknown model type: {model_name}")

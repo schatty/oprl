@@ -13,10 +13,11 @@ from utils.logger import Logger
 
 class Agent(object):
 
-    def __init__(self, config, actor_learner, global_episode, n_agent=0, log_dir=''):
+    def __init__(self, config, policy, global_episode, n_agent=0, agent_type='exploration', log_dir=''):
         print(f"Initializing agent {n_agent}...")
         self.config = config
         self.n_agent = n_agent
+        self.agent_type = agent_type
         self.max_steps = config['max_ep_length']
         self.num_episode_save = config['num_episode_save']
         self.global_episode = global_episode
@@ -28,25 +29,33 @@ class Agent(object):
         self.ou_noise = OUNoise(self.env_wrapper.get_action_space())
         self.ou_noise.reset()
 
-        self.actor_learner = actor_learner
-        self.actor = create_actor(model_name=config['model'],
+        '''
+        if self.agent_type == "exploration":
+            self.actor = create_actor(model_name=config['model'],
                                   num_actions=config['action_dims'],
                                   num_states=config['state_dims'],
                                   hidden_size=config['dense_size'])
-        self.actor.eval()
+            self.actor.eval()
+        else:
+            self.actor = policy
+        '''
+        self.actor = policy
 
         # Logger
-        log_path = f"{log_dir}/agent-{n_agent}.pkl"
+        log_path = f"{log_dir}/agent-{n_agent}"
         self.logger = Logger(log_path)
 
-    def update_actor_learner(self):
+    def update_actor_learner(self, learner_w_queue):
         """Update local actor to the actor from learner. """
-        source = self.actor_learner
+        if learner_w_queue.empty():
+            return
+        source = learner_w_queue.get()
         target = self.actor
-        for target_param, param in zip(target.parameters(), source.parameters()):
-            target_param.data.copy_(param.data)
+        for target_param, source_param in zip(target.parameters(), source):
+            w = torch.tensor(source_param).float()
+            target_param.data.copy_(w)
 
-    def run(self, training_on, replay_queue, update_step):
+    def run(self, training_on, replay_queue, learner_w_queue, update_step):
         # Initialise deque buffer to store experiences for N-step returns
         self.exp_buffer = deque()
 
@@ -68,8 +77,11 @@ class Agent(object):
             done = False
             while not done:
                 action = self.actor.get_action(state)
-                action = self.ou_noise.get_action(action, num_steps)
-                action = action.squeeze(0)
+                if self.agent_type == "exploration":
+                    action = self.ou_noise.get_action(action, num_steps)
+                    action = action.squeeze(0)
+                else:
+                    action = action.detach().cpu().numpy().flatten()
                 next_state, reward, done = self.env_wrapper.step(action)
 
                 episode_reward += reward
@@ -108,9 +120,9 @@ class Agent(object):
                 num_steps += 1
 
             # Log metrics
-            self.logger.scalar_summary("update_step", update_step.value)
-            self.logger.scalar_summary("reward", episode_reward)
-            self.logger.scalar_summary("episode_timing", time.time() - ep_start_time)
+            step = update_step.value
+            self.logger.scalar_summary("agent/reward", episode_reward, step)
+            self.logger.scalar_summary("agent/episode_timing", time.time() - ep_start_time, step)
 
             # Saving agent
             if self.local_episode % self.num_episode_save == 0 or episode_reward > best_reward:
@@ -119,8 +131,8 @@ class Agent(object):
                 self.save(f"local_episode_{self.local_episode}_reward_{best_reward:4f}")
 
             rewards.append(episode_reward)
-            if self.local_episode % self.config['update_agent_ep'] == 0:
-                self.update_actor_learner()
+            if self.agent_type == "exploration" and self.local_episode % self.config['update_agent_ep'] == 0:
+                self.update_actor_learner(learner_w_queue)
 
         while not replay_queue.empty():
             replay_queue.get()

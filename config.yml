@@ -1,14 +1,14 @@
 # Environment parameters
 
-env: Pendulum-v0
+env: BipedalWalker-v2
 random_seed: 2019
-num_agents: 2
+num_agents: 4
 
 # Training parameters
 
 model: d4pg
 batch_size: 256
-num_steps_train: 5000 # number of episodes from all agents
+num_steps_train: 30_000 # number of episodes from all agents
 max_ep_length: 1000 # maximum number of steps per episode
 replay_mem_size: 1000000 # maximum capacity of replay memory
 priority_alpha: 0.6 # controls the randomness vs prioritisation of the prioritised sampling (0.0 = Uniform sampling, 1.0 = Greedy prioritisation)

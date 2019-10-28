@@ -92,7 +92,7 @@ class PolicyNetwork(nn.Module):
 class LearnerD4PG(object):
     """Policy and value network update routine. """
 
-    def __init__(self, config, log_dir=''):
+    def __init__(self, config, target_policy_net, learner_w_queue, log_dir=''):
         hidden_dim = config['dense_size']
         state_dim = config['state_dims']
         action_dim = config['action_dims']
@@ -109,9 +109,9 @@ class LearnerD4PG(object):
         self.gamma = config['discount_rate']
         self.log_dir = log_dir
         self.prioritized_replay = config['replay_memory_prioritized']
+        self.learner_w_queue = learner_w_queue
 
-        log_path = f"{log_dir}/learner.pkl"
-        self.logger = Logger(log_path)
+        self.logger = Logger(log_dir)
 
         # Noise process
         env = create_env_wrapper(config)
@@ -122,7 +122,7 @@ class LearnerD4PG(object):
         self.value_net = ValueNetwork(state_dim, action_dim, hidden_dim, v_min, v_max, num_atoms, device=self.device)
         self.policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim, device=self.device)
         self.target_value_net = ValueNetwork(state_dim, action_dim, hidden_dim, v_min, v_max, num_atoms, device=self.device)
-        self.target_policy_net = PolicyNetwork(state_dim, action_dim, hidden_dim, device=self.device)
+        self.target_policy_net = target_policy_net
 
         for target_param, param in zip(self.target_value_net.parameters(), self.value_net.parameters()):
             target_param.data.copy_(param.data)
@@ -136,7 +136,7 @@ class LearnerD4PG(object):
         self.value_criterion = nn.BCELoss(reduction='none')
 
     def ddpg_update(self, batch, replay_priority_queue, update_step, min_value=-np.inf, max_value=np.inf):
-        self.logger.scalar_summary("update_step", update_step.value)
+        update_time = time.time()
 
         state, action, reward, next_state, done, gamma, weights, inds = batch
 
@@ -200,7 +200,6 @@ class LearnerD4PG(object):
         self.value_optimizer.zero_grad()
         value_loss.backward()
         self.value_optimizer.step()
-        self.logger.scalar_summary("value_loss", value_loss.item())
 
         # -------- Update actor -----------
 
@@ -208,7 +207,6 @@ class LearnerD4PG(object):
         policy_loss = policy_loss * torch.tensor(self.value_net.z_atoms).float().cuda()
         policy_loss = torch.sum(policy_loss, dim=1)
         policy_loss = -policy_loss.mean()
-        self.logger.scalar_summary("policy_loss", policy_loss.item())
 
         self.policy_optimizer.zero_grad()
         policy_loss.backward()
@@ -224,17 +222,26 @@ class LearnerD4PG(object):
                 target_param.data * (1.0 - self.tau) + param.data * self.tau
             )
 
+        # Send updated learner to the queue
+        if not self.learner_w_queue.full():
+            params = [p.data.cpu().detach().numpy() for p in self.policy_net.parameters()]
+            self.learner_w_queue.put(params)
+
+        # Logging
+        step = update_step.value
+        self.logger.scalar_summary("learner/policy_loss", policy_loss.item(), step)
+        self.logger.scalar_summary("learner/value_loss", value_loss.item(), step)
+        self.logger.scalar_summary("learner/learner_update_timing", time.time() - update_time, step)
+
     def run(self, training_on, batch_queue, replay_priority_queue, update_step):
         while update_step.value < self.num_train_steps:
             if batch_queue.empty():
                 continue
+
             batch = batch_queue.get()
-
-            update_time = time.time()
             self.ddpg_update(batch, replay_priority_queue, update_step)
-            self.logger.scalar_summary("learner_update_timing", time.time() - update_time)
-
             update_step.value += 1
+
             if update_step.value % 50 == 0:
                 print("Training step ", update_step.value)
 
