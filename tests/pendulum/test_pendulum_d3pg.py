@@ -1,5 +1,5 @@
 import unittest
-from scripts.train import train, read_config
+from models.d3pg.train import train, read_config
 
 
 class TestsPendulumD3PG(unittest.TestCase):

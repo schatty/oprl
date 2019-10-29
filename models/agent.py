@@ -5,10 +5,9 @@ from collections import deque
 import matplotlib.pyplot as plt
 import torch
 
-from .utils import create_actor
 from utils.utils import OUNoise, make_gif
-from env.utils import create_env_wrapper
 from utils.logger import Logger
+from env.utils import create_env_wrapper
 
 
 class Agent(object):
@@ -26,19 +25,9 @@ class Agent(object):
 
         # Create environment
         self.env_wrapper = create_env_wrapper(config)
-        self.ou_noise = OUNoise(self.env_wrapper.get_action_space())
+        self.ou_noise = OUNoise(dim=config["action_dim"], low=config["action_low"], high=config["action_high"])
         self.ou_noise.reset()
 
-        '''
-        if self.agent_type == "exploration":
-            self.actor = create_actor(model_name=config['model'],
-                                  num_actions=config['action_dims'],
-                                  num_states=config['state_dims'],
-                                  hidden_size=config['dense_size'])
-            self.actor.eval()
-        else:
-            self.actor = policy
-        '''
         self.actor = policy
 
         # Logger
@@ -138,8 +127,8 @@ class Agent(object):
             replay_queue.get()
 
         # Save replay from the first agent only
-        if self.n_agent == 0:
-            self.save_replay_gif()
+        # if self.n_agent == 0:
+        #    self.save_replay_gif()
 
         print(f"Agent {self.n_agent} done.")
 

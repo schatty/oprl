@@ -1,0 +1,40 @@
+# Environment parameters
+
+env: BipedalWalker-v2
+state_dim: 24
+action_dim: 4
+action_low: -1
+action_high: 1
+num_agents: 4
+random_seed: 2019
+
+# Training parameters
+
+model: d3pg
+batch_size: 256
+num_steps_train: 400_000 # number of episodes from all agents
+max_ep_length: 1000 # maximum number of steps per episode
+replay_mem_size: 1000000 # maximum capacity of replay memory
+priority_alpha: 0.6 # controls the randomness vs prioritisation of the prioritised sampling (0.0 = Uniform sampling, 1.0 = Greedy prioritisation)
+priority_beta_start: 0.4 # starting value of beta - controls to what degree IS weights influence the gradient updates to correct for the bias introduces by priority sampling (0 - no correction, 1 - full correction)
+priority_beta_end: 1.0 # beta will be linearly annelaed from its start value to this value thoughout training
+discount_rate: 0.99 # Discount rate (gamma) for future rewards
+n_step_returns: 5 # number of future steps to collect experiences for N-step returns
+update_agent_ep: 1 # agent gets latest parameters from learner every update_agent_ep episodes
+replay_queue_size: 64 # queue with replays from all the agents
+batch_queue_size: 64 # queue with batches given to learner
+num_episode_save: 100
+device: cuda
+
+# Network parameters
+
+critic_learning_rate: 0.0005
+actor_learning_rate: 0.0005
+dense_size: 400 # size of the 2 hidden layers in networks
+final_layer_init: 0.003
+tau: 0.001 # parameter for soft target network updates
+
+# Miscellaneous
+
+results_path: results
+

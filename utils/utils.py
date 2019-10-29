@@ -7,16 +7,16 @@ import yaml
 
 
 class OUNoise(object):
-    def __init__(self, action_space, mu=0.0, theta=0.15, max_sigma=0.3, min_sigma=0.3, decay_period=10_000):
+    def __init__(self, dim, low, high, mu=0.0, theta=0.15, max_sigma=0.3, min_sigma=0.3, decay_period=10_000):
         self.mu = mu
         self.theta = theta
         self.sigma = max_sigma
         self.max_sigma = max_sigma
         self.min_sigma = min_sigma
         self.decay_period = decay_period
-        self.action_dim = action_space.shape[0]
-        self.low = action_space.low
-        self.high = action_space.high
+        self.action_dim = dim
+        self.low = low
+        self.high = high
 
     def reset(self):
         self.state = np.ones(self.action_dim) * self.mu
