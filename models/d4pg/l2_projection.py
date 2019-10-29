@@ -26,6 +26,10 @@ def _l2_project(z_p, p, z_q):
     # `tf.expand_dims()` (e.g., `x[:, None, :]` reshapes a tensor of shape
     # `[k, l]' to one of shape `[k, 1, l]`).
 
+    print("z_p: ", z_p.shape)
+    print("p: ", p.shape)
+    print("z_q: ", z_q.shape)
+
     z_p = torch.tensor(z_p).float()
 
     # Extract vmin and vmax and construct helper tensors from z_q
@@ -51,3 +55,53 @@ def _l2_project(z_p, p, z_q):
     delta_hat = (d_sign * delta_qp * d_pos) - ((1. - d_sign) * delta_qp * d_neg)
     p = p[:, None, :]
     return torch.sum(torch.clamp(1. - delta_hat, 0., 1.) * p, -1)
+#
+import numpy as np
+
+
+def _l2_project2(next_distr_v, rewards_v, dones_mask_t, gamma, DELTA_Z, N_ATOMS, Vmin, Vmax, device="cpu"):
+    #print("next_distr_v: ", next_distr_v.shape, type(next_distr_v))
+    #print("rewards_v: ", rewards_v.shape, type(rewards_v))
+    #print("dones_mask_t: ", dones_mask_t.shape, type(dones_mask_t))
+
+    next_distr = next_distr_v.data.cpu().numpy()
+    rewards = rewards_v.data.cpu().numpy()
+    dones_mask = dones_mask_t.cpu().numpy().astype(np.bool)
+    batch_size = len(rewards)
+    proj_distr = np.zeros((batch_size, N_ATOMS), dtype=np.float32)
+
+    #print("DELTA_Z: ", DELTA_Z)
+    for atom in range(N_ATOMS):
+        tz_j = np.minimum(Vmax, np.maximum(Vmin, rewards + (Vmin + atom * DELTA_Z) * gamma))
+        #if atom == 0:
+        #    print("tz_j: ", tz_j.shape)
+        b_j = (tz_j - Vmin) / DELTA_Z
+        l = np.floor(b_j).astype(np.int64)
+        u = np.ceil(b_j).astype(np.int64)
+        eq_mask = u == l
+        proj_distr[eq_mask, l[eq_mask]] += next_distr[eq_mask, atom]
+        ne_mask = u != l
+        proj_distr[ne_mask, l[ne_mask]] += next_distr[ne_mask, atom] * (u - b_j)[ne_mask]
+        proj_distr[ne_mask, u[ne_mask]] += next_distr[ne_mask, atom] * (b_j - l)[ne_mask]
+
+    if dones_mask.any():
+        proj_distr[dones_mask] = 0.0
+        tz_j = np.minimum(Vmax, np.maximum(Vmin, rewards[dones_mask]))
+        b_j = (tz_j - Vmin) / DELTA_Z
+        l = np.floor(b_j).astype(np.int64)
+        u = np.ceil(b_j).astype(np.int64)
+        eq_mask = u == l
+        eq_dones = dones_mask.copy()
+        eq_dones[dones_mask] = eq_mask
+        if eq_dones.any():
+            proj_distr[eq_dones, l[eq_mask]] = 1.0
+        ne_mask = u != l
+        ne_dones = dones_mask.copy()
+        ne_dones[dones_mask] = ne_mask
+        if ne_dones.any():
+            proj_distr[ne_dones, l[ne_mask]] = (u - b_j)[ne_mask]
+            proj_distr[ne_dones, u[ne_mask]] = (b_j - l)[ne_mask]
+
+    #print("proj_distr: ", proj_distr.shape, type(proj_distr))
+
+    return torch.FloatTensor(proj_distr).to(device)
