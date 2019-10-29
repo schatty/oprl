@@ -68,6 +68,9 @@ def sampler_worker(config, replay_queue, batch_queue, replay_priorities_queue, t
 
     print("Stop sampler worker.")
 
+    if config['save_buffer_on_disk']:
+        replay_buffer.dump(config["results_path"])
+
 
 def learner_worker(config, training_on, policy, target_policy_net, learner_w_queue, replay_priority_queue,
                    batch_queue, update_step, experiment_dir):
