@@ -10,7 +10,7 @@ from utils.reward_plot import plot_rewards
 from utils.logger import Logger
 
 from .networks import PolicyNetwork, ValueNetwork
-from .l2_projection import _l2_project
+from .l2_projection import _l2_project2
 
 
 class LearnerD4PG(object):
@@ -22,9 +22,9 @@ class LearnerD4PG(object):
         action_dim = config['action_dims']
         value_lr = config['critic_learning_rate']
         policy_lr = config['actor_learning_rate']
-        v_min = config['v_min']
-        v_max = config['v_max']
-        num_atoms = config['num_atoms']
+        self.v_min = config['v_min']
+        self.v_max = config['v_max']
+        self.num_atoms = config['num_atoms']
         self.device = config['device']
         self.max_steps = config['max_ep_length']
         self.num_train_steps = config['num_steps_train']
@@ -34,6 +34,7 @@ class LearnerD4PG(object):
         self.log_dir = log_dir
         self.prioritized_replay = config['replay_memory_prioritized']
         self.learner_w_queue = learner_w_queue
+        self.delta_z = (self.v_max - self.v_min) / (self.num_atoms - 1)
 
         self.logger = Logger(f"{log_dir}/learner")
 
@@ -41,9 +42,9 @@ class LearnerD4PG(object):
         self.ou_noise = OUNoise(dim=config["action_dim"], low=config["action_low"], high=config["action_high"])
 
         # Value and policy nets
-        self.value_net = ValueNetwork(state_dim, action_dim, hidden_dim, v_min, v_max, num_atoms, device=self.device)
+        self.value_net = ValueNetwork(state_dim, action_dim, hidden_dim, self.v_min, self.v_max, self.num_atoms, device=self.device)
         self.policy_net = policy_net #PolicyNetwork(state_dim, action_dim, hidden_dim, device=self.device)
-        self.target_value_net = ValueNetwork(state_dim, action_dim, hidden_dim, v_min, v_max, num_atoms, device=self.device)
+        self.target_value_net = ValueNetwork(state_dim, action_dim, hidden_dim, self.v_min, self.v_max, self.num_atoms, device=self.device)
         self.target_policy_net = target_policy_net
 
         for target_param, param in zip(self.target_value_net.parameters(), self.value_net.parameters()):
@@ -73,8 +74,8 @@ class LearnerD4PG(object):
         state = torch.from_numpy(state).float().to(self.device)
         next_state = torch.from_numpy(next_state).float().to(self.device)
         action = torch.from_numpy(action).float().to(self.device)
-        reward = torch.from_numpy(reward).float().unsqueeze(1).to(self.device)
-        done = torch.from_numpy(done).float().unsqueeze(1).to(self.device)
+        reward = torch.from_numpy(reward).float().to(self.device)
+        done = torch.from_numpy(done).float().to(self.device)
 
         # ------- Update critic -------
 
@@ -83,6 +84,9 @@ class LearnerD4PG(object):
 
         # Predict Z distribution with target value network
         target_value = self.target_value_net.get_probs(next_state, next_action.detach())
+        #print("target_value: ", target_value.shape, type(target_value))
+
+        '''
         target_z_atoms = self.value_net.z_atoms
 
         # Batch of z-atoms
@@ -98,6 +102,9 @@ class LearnerD4PG(object):
         target_z_projected = _l2_project(torch.from_numpy(target_Z_atoms).cpu().float(),
                                          target_value.cpu().float(),
                                          torch.from_numpy(self.value_net.z_atoms).cpu().float())
+        '''
+
+        target_z_projected = _l2_project2(target_value, reward, done, self.gamma ** 5, N_ATOMS=self.num_atoms, Vmin=self.v_min, Vmax=self.v_max, DELTA_Z=self.delta_z)
 
         critic_value = self.value_net.get_probs(state, action)#self.value_net(state, action)
 
