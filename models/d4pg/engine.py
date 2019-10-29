@@ -124,7 +124,8 @@ class Engine(object):
         target_policy_net = PolicyNetwork(config['state_dims'], config['action_dims'],
                                           config['dense_size'], device=config['device'])
         policy_net = copy.deepcopy(target_policy_net)
-
+        policy_net_cpu = PolicyNetwork(config['state_dims'], config['action_dims'],
+                                          config['dense_size'], device='cpu')
         target_policy_net.share_memory()
 
         p = torch_mp.Process(target=learner_worker, args=(config, training_on, policy_net, target_policy_net, learner_w_queue,
@@ -140,7 +141,7 @@ class Engine(object):
         # Agents (exploration processes)
         for i in range(1, n_agents):
             p = torch_mp.Process(target=agent_worker,
-                                 args=(config, policy_net, learner_w_queue, global_episode, i, "exploration", experiment_dir,
+                                 args=(config, policy_net_cpu, learner_w_queue, global_episode, i, "exploration", experiment_dir,
                                        training_on, replay_queue, update_step))
             processes.append(p)
 

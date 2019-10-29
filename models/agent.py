@@ -29,6 +29,7 @@ class Agent(object):
         self.ou_noise.reset()
 
         self.actor = policy
+        print("Agent ", n_agent, self.actor.device)
 
         # Logger
         log_path = f"{log_dir}/agent-{n_agent}"
