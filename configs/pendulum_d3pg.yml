@@ -12,7 +12,7 @@ random_seed: 2019
 
 model: d3pg
 batch_size: 256
-num_steps_train: 50_000 # number of episodes from all agents
+num_steps_train: 100_000 # number of episodes from all agents
 max_ep_length: 400 # maximum number of steps per episode
 replay_mem_size: 1_000_000 # maximum capacity of replay memory
 discount_rate: 0.99 # Discount rate (gamma) for future rewards

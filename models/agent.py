@@ -2,7 +2,6 @@ import shutil
 import os
 import time
 from collections import deque
-import matplotlib.pyplot as plt
 import torch
 
 from utils.utils import OUNoise, make_gif
@@ -138,8 +137,10 @@ class Agent(object):
         model_fn = f"{process_dir}/{checkpoint_name}.pt"
         torch.save(self.actor, model_fn)
 
-    def save_replay_gif(self):
-        dir_name = "replay_render"
+    def save_replay_gif(self, output_dir_name):
+        import matplotlib.pyplot as plt
+
+        dir_name = output_dir_name
         if not os.path.exists(dir_name):
             os.makedirs(dir_name)
 
