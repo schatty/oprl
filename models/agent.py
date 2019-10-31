@@ -115,7 +115,9 @@ class Agent(object):
             self.logger.scalar_summary("agent/episode_timing", time.time() - ep_start_time, step)
 
             # Saving agent
-            if self.local_episode % self.num_episode_save == 0 or episode_reward > best_reward:
+            reward_outperformed = episode_reward - best_reward > self.config["save_reward_threshold"]
+            time_to_save = self.local_episode % self.num_episode_save == 0
+            if self.n_agent == 0 and (time_to_save or reward_outperformed):
                 if episode_reward > best_reward:
                     best_reward = episode_reward
                 self.save(f"local_episode_{self.local_episode}_reward_{best_reward:4f}")
@@ -126,10 +128,6 @@ class Agent(object):
 
         while not replay_queue.empty():
             replay_queue.get()
-
-        # Save replay from the first agent only
-        # if self.n_agent == 0:
-        #    self.save_replay_gif()
 
         print(f"Agent {self.n_agent} done.")
 

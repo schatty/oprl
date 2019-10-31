@@ -27,6 +27,7 @@ replay_memory_prioritized: 0
 num_episode_save: 100
 device: cuda
 save_buffer_on_disk: 0
+save_reward_threshold: 1 # difference in best reward to save agent model
 
 
 # Network parameters
