@@ -4,7 +4,7 @@ import time
 from collections import deque
 import torch
 
-from utils.utils import OUNoise, make_gif
+from utils.utils import OUNoise, make_gif, empty_torch_queue
 from utils.logger import Logger
 from env.utils import create_env_wrapper
 
@@ -43,6 +43,7 @@ class Agent(object):
         for target_param, source_param in zip(target.parameters(), source):
             w = torch.tensor(source_param).float()
             target_param.data.copy_(w)
+        del source
 
     def run(self, training_on, replay_queue, learner_w_queue, update_step):
         # Initialise deque buffer to store experiences for N-step returns
@@ -125,9 +126,7 @@ class Agent(object):
             if self.agent_type == "exploration" and self.local_episode % self.config['update_agent_ep'] == 0:
                 self.update_actor_learner(learner_w_queue)
 
-        while not replay_queue.empty():
-            replay_queue.get()
-
+        empty_torch_queue(replay_queue)
         print(f"Agent {self.n_agent} done.")
 
     def save(self, checkpoint_name):

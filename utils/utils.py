@@ -1,5 +1,4 @@
 import numpy as np
-import gym
 import imageio
 from glob import glob
 import os
@@ -63,15 +62,14 @@ def read_config(path):
     """
     with open(path, 'r') as ymlfile:
         cfg = yaml.load(ymlfile)
-
-    # Load environment from gym to set its params
-    env = gym.make(cfg['env'])
-    cfg['state_dims'] = env.observation_space.shape[0]
-    cfg['state_bound_low'] = env.observation_space.low
-    cfg['state_bound_high'] = env.observation_space.high
-    cfg['action_dims'] = env.action_space.shape[0]
-    cfg['action_bound_low'] = env.action_space.low
-    cfg['action_bound_high'] = env.action_space.high
-    del env
-
     return cfg
+
+
+def empty_torch_queue(q):
+    while True:
+        try:
+            o = q.get_nowait()
+            del o
+        except:
+            break
+    q.close()

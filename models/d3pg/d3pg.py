@@ -5,9 +5,9 @@ import torch.nn as nn
 import torch.optim as optim
 import time
 
-from utils.utils import OUNoise
+from utils.utils import OUNoise, empty_torch_queue
 from utils.logger import Logger
-from .networks import ValueNetwork, PolicyNetwork
+from .networks import ValueNetwork
 
 
 class LearnerD3PG(object):
@@ -21,8 +21,8 @@ class LearnerD3PG(object):
         hidden_dim = config['dense_size']
         value_lr = config['critic_learning_rate']
         policy_lr = config['actor_learning_rate']
-        state_dim = config['state_dims']
-        action_dim = config['action_dims']
+        state_dim = config['state_dim']
+        action_dim = config['action_dim']
         self.num_train_steps = config['num_steps_train']
         self.device = config['device']
         self.max_steps = config['max_ep_length']
@@ -119,4 +119,5 @@ class LearnerD3PG(object):
                 print("Training step ", update_step.value)
 
         training_on.value = 0
+        empty_torch_queue(self.learner_w_queue)
         print("Exit learner.")

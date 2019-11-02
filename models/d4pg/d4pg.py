@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from utils.utils import OUNoise
+from utils.utils import OUNoise, empty_torch_queue
 from utils.logger import Logger
 
 from .networks import ValueNetwork
@@ -16,8 +16,8 @@ class LearnerD4PG(object):
 
     def __init__(self, config, policy_net, target_policy_net, learner_w_queue, log_dir=''):
         hidden_dim = config['dense_size']
-        state_dim = config['state_dims']
-        action_dim = config['action_dims']
+        state_dim = config['state_dim']
+        action_dim = config['action_dim']
         value_lr = config['critic_learning_rate']
         policy_lr = config['actor_learning_rate']
         self.v_min = config['v_min']
@@ -106,7 +106,7 @@ class LearnerD4PG(object):
         if self.prioritized_replay:
             weights_update = np.abs(td_error) + priority_epsilon
             replay_priority_queue.put((inds, weights_update))
-            value_loss = value_loss * torch.tensor(weights).cuda().float()
+            value_loss = value_loss * torch.tensor(weights).float().to(self.device)
 
         # Update step
         value_loss = value_loss.mean()
@@ -117,7 +117,7 @@ class LearnerD4PG(object):
         # -------- Update actor -----------
 
         policy_loss = self.value_net.get_probs(state, self.policy_net(state))
-        policy_loss = policy_loss * torch.from_numpy(self.value_net.z_atoms).float().cuda()
+        policy_loss = policy_loss * torch.from_numpy(self.value_net.z_atoms).float().to(self.device)
         policy_loss = torch.sum(policy_loss, dim=1)
         policy_loss = -policy_loss.mean()
 
@@ -159,4 +159,7 @@ class LearnerD4PG(object):
                 print("Training step ", update_step.value)
 
         training_on.value = 0
+
+        empty_torch_queue(self.learner_w_queue)
+        empty_torch_queue(replay_priority_queue)
         print("Exit learner.")

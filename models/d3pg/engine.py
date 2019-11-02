@@ -2,6 +2,7 @@ import copy
 from datetime import datetime
 from multiprocessing import set_start_method
 import torch.multiprocessing as torch_mp
+import multiprocessing as mp
 try:
     set_start_method('spawn')
 except RuntimeError:
@@ -10,6 +11,7 @@ import os
 
 from models.agent import Agent
 from utils.logger import Logger
+from utils.utils import empty_torch_queue
 
 from .d3pg import LearnerD3PG
 from .networks import PolicyNetwork
@@ -30,8 +32,6 @@ def sampler_worker(config, replay_queue, batch_queue, training_on,
         log_dir:
     """
     batch_size = config['batch_size']
-
-    # Logger
     logger = Logger(f"{log_dir}/data_struct")
 
     # Create replay buffer
@@ -55,9 +55,6 @@ def sampler_worker(config, replay_queue, batch_queue, training_on,
             batch = replay_buffer.sample(batch_size)
             batch_queue.put(batch)
 
-        #if update_step.value % 1000 == 0:
-        #    print("Step: ", update_step.value, " buffer: ", len(replay_buffer))
-
         # Log data structures sizes
         step = update_step.value
         logger.scalar_summary("data_stuct/global_episode", global_episode.value, step)
@@ -65,6 +62,7 @@ def sampler_worker(config, replay_queue, batch_queue, training_on,
         logger.scalar_summary("data_struct/batch_queue", batch_queue.qsize(), step)
         logger.scalar_summary("data_struct/replay_buffer", len(replay_buffer), step)
 
+    empty_torch_queue(batch_queue)
     print("Stop sampler worker.")
 
 
@@ -102,10 +100,10 @@ class Engine(object):
 
         # Data structures
         processes = []
-        replay_queue = torch_mp.Queue(maxsize=256)
-        training_on = torch_mp.Value('i', 1)
-        update_step = torch_mp.Value('i', 0)
-        global_episode = torch_mp.Value('i', 0)
+        replay_queue = mp.Queue(maxsize=64)
+        training_on = mp.Value('i', 1)
+        update_step = mp.Value('i', 0)
+        global_episode = mp.Value('i', 0)
         learner_w_queue = torch_mp.Queue(maxsize=n_agents)
 
         # Data sampler
@@ -116,10 +114,10 @@ class Engine(object):
         processes.append(p)
 
         # Learner (neural net training process)
-        target_policy_net = PolicyNetwork(config['state_dims'], config['action_dims'],
+        target_policy_net = PolicyNetwork(config['state_dim'], config['action_dim'],
                                           config['dense_size'], device=config['device'])
         policy_net = copy.deepcopy(target_policy_net)
-        policy_net_cpu = PolicyNetwork(config['state_dims'], config['action_dims'],
+        policy_net_cpu = PolicyNetwork(config['state_dim'], config['action_dim'],
                                           config['dense_size'], device='cpu')
 
         target_policy_net.share_memory()

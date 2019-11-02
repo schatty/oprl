@@ -10,6 +10,7 @@ import os
 
 from models.agent import Agent
 from utils.logger import Logger
+from utils.utils import empty_torch_queue
 
 from .d4pg import LearnerD4PG
 from .networks import PolicyNetwork
@@ -30,8 +31,6 @@ def sampler_worker(config, replay_queue, batch_queue, replay_priorities_queue, t
         log_dir:
     """
     batch_size = config['batch_size']
-
-    # Logger
     logger = Logger(f"{log_dir}/data_struct")
 
     # Create replay buffer
@@ -56,9 +55,6 @@ def sampler_worker(config, replay_queue, batch_queue, replay_priorities_queue, t
             batch = replay_buffer.sample(batch_size)
             batch_queue.put(batch)
 
-        #if update_step.value % 1000 == 0:
-        #    print("Step: ", update_step.value, " buffer: ", len(replay_buffer))
-
         # Log data structures sizes
         step = update_step.value
         logger.scalar_summary("data_stuct/global_episode", global_episode.value, step)
@@ -66,10 +62,11 @@ def sampler_worker(config, replay_queue, batch_queue, replay_priorities_queue, t
         logger.scalar_summary("data_struct/batch_queue", batch_queue.qsize(), step)
         logger.scalar_summary("data_struct/replay_buffer", len(replay_buffer), step)
 
-    print("Stop sampler worker.")
-
     if config['save_buffer_on_disk']:
         replay_buffer.dump(config["results_path"])
+
+    empty_torch_queue(batch_queue)
+    print("Stop sampler worker.")
 
 
 def learner_worker(config, training_on, policy, target_policy_net, learner_w_queue, replay_priority_queue,
@@ -121,10 +118,10 @@ class Engine(object):
         processes.append(p)
 
         # Learner (neural net training process)
-        target_policy_net = PolicyNetwork(config['state_dims'], config['action_dims'],
+        target_policy_net = PolicyNetwork(config['state_dim'], config['action_dim'],
                                           config['dense_size'], device=config['device'])
         policy_net = copy.deepcopy(target_policy_net)
-        policy_net_cpu = PolicyNetwork(config['state_dims'], config['action_dims'],
+        policy_net_cpu = PolicyNetwork(config['state_dim'], config['action_dim'],
                                           config['dense_size'], device='cpu')
         target_policy_net.share_memory()
 
