@@ -27,6 +27,7 @@ Run `train.py --config configs/pendulum_d4pg.yml`
 All results were obtained with configs in `configs` directory
 
 ## References
-[1] DDPG [https://arxiv.org/abs/1509.02971]
-[2] Distributional Perspective on RL [https://arxiv.org/abs/1804.08617]
-[2] D4PG [https://arxiv.org/abs/1804.08617]
+
+* DDPG [https://arxiv.org/abs/1509.02971]
+* Distributional Perspective on RL [https://arxiv.org/abs/1804.08617]
+* D4PG [https://arxiv.org/abs/1804.08617]
