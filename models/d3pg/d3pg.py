@@ -7,7 +7,6 @@ import time
 
 from utils.utils import OUNoise
 from utils.logger import Logger
-from utils.reward_plot import plot_rewards
 from .networks import ValueNetwork, PolicyNetwork
 
 
@@ -120,5 +119,4 @@ class LearnerD3PG(object):
                 print("Training step ", update_step.value)
 
         training_on.value = 0
-        plot_rewards(self.log_dir)
         print("Exit learner.")

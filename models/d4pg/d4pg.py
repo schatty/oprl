@@ -5,10 +5,9 @@ import torch.nn as nn
 import torch.optim as optim
 
 from utils.utils import OUNoise
-from utils.reward_plot import plot_rewards
 from utils.logger import Logger
 
-from .networks import PolicyNetwork, ValueNetwork
+from .networks import ValueNetwork
 from .l2_projection import _l2_project
 
 
@@ -160,5 +159,4 @@ class LearnerD4PG(object):
                 print("Training step ", update_step.value)
 
         training_on.value = 0
-        plot_rewards(self.log_dir)
         print("Exit learner.")
