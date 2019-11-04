@@ -26,6 +26,7 @@ batch_queue_size: 64 # queue with batches given to learner
 replay_memory_prioritized: 0
 num_episode_save: 100
 device: cpu
+agent_device: cpu
 save_buffer_on_disk: 0
 save_reward_threshold: 1 # difference in best reward to save agent model
 
