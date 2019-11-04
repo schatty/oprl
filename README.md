@@ -3,10 +3,7 @@
 PyTorch implementation of Distributed Distributional Deterministic Policy Gradients (https://arxiv.org/abs/1804.08617).
 <img width="865" alt="arch" src="https://user-images.githubusercontent.com/23639048/62874932-bedde500-bd2a-11e9-82e3-6b4899b4e6d2.png">
 
-__Supported environments__
-* Pendulum-v0
-* LunarLanderContinous-v2
-* BipedalWalker-v2
+Implementation was tested on environments from OpenAI Gym.
 
 # About
 D4PG and D3PG implementations with following features
@@ -23,7 +20,7 @@ Run `train.py --config configs/pendulum_d4pg.yml`
 `python -m unittest discover`
 
 ## Results
-<img width="1014" alt="curves" src="https://user-images.githubusercontent.com/23639048/68063948-7b41b880-fd26-11e9-839f-f042dc54de0e.png">
+![plot](https://user-images.githubusercontent.com/23639048/68146326-d3580500-ff48-11e9-9cd6-739c8e6b7a2d.png)
 
 ## Reproduce
 All results were obtained with configs in `configs` directory
