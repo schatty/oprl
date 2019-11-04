@@ -122,7 +122,7 @@ class Engine(object):
                                           config['dense_size'], device=config['device'])
         policy_net = copy.deepcopy(target_policy_net)
         policy_net_cpu = PolicyNetwork(config['state_dim'], config['action_dim'],
-                                          config['dense_size'], device='cpu')
+                                          config['dense_size'], device=config['agent_device'])
         target_policy_net.share_memory()
 
         p = torch_mp.Process(target=learner_worker, args=(config, training_on, policy_net, target_policy_net, learner_w_queue,

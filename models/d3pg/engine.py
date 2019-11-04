@@ -57,7 +57,7 @@ def sampler_worker(config, replay_queue, batch_queue, training_on,
 
         # Log data structures sizes
         step = update_step.value
-        logger.scalar_summary("data_stuct/global_episode", global_episode.value, step)
+        logger.scalar_summary("data_struct/global_episode", global_episode.value, step)
         logger.scalar_summary("data_struct/replay_queue", replay_queue.qsize(), step)
         logger.scalar_summary("data_struct/batch_queue", batch_queue.qsize(), step)
         logger.scalar_summary("data_struct/replay_buffer", len(replay_buffer), step)
@@ -118,7 +118,7 @@ class Engine(object):
                                           config['dense_size'], device=config['device'])
         policy_net = copy.deepcopy(target_policy_net)
         policy_net_cpu = PolicyNetwork(config['state_dim'], config['action_dim'],
-                                          config['dense_size'], device='cpu')
+                                          config['dense_size'], device=config['agent_device'])
 
         target_policy_net.share_memory()
 

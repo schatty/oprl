@@ -31,4 +31,9 @@ class EnvWrapper:
     def get_action_space(self):
         return self.env.action_space
 
+    def normalise_state(self, state):
+        return state
+
+    def normalise_reward(self, reward):
+        return reward
 

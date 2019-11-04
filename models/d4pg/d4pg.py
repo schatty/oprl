@@ -155,7 +155,7 @@ class LearnerD4PG(object):
             self._update_step(batch, replay_priority_queue, update_step)
             update_step.value += 1
 
-            if update_step.value % 50 == 0:
+            if update_step.value % 1000 == 0:
                 print("Training step ", update_step.value)
 
         training_on.value = 0

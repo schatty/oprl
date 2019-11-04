@@ -18,6 +18,7 @@ class LearnerD3PG(object):
         Args:
             config (dict): configuration
         """
+        self.config = config
         hidden_dim = config['dense_size']
         value_lr = config['critic_learning_rate']
         policy_lr = config['actor_learning_rate']
@@ -97,7 +98,7 @@ class LearnerD3PG(object):
 
         # Send updated learner to the queue
         if not self.learner_w_queue.full():
-            params = [p.data.cpu().detach().numpy() for p in self.policy_net.parameters()]
+            params = [p.data.to(self.config["agent_device"]).detach().numpy() for p in self.policy_net.parameters()]
             self.learner_w_queue.put(params)
 
         # Logging
@@ -115,7 +116,7 @@ class LearnerD3PG(object):
             self._update_step(batch, update_step)
 
             update_step.value += 1
-            if update_step.value % 50 == 0:
+            if update_step.value % 1000 == 0:
                 print("Training step ", update_step.value)
 
         training_on.value = 0

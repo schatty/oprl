@@ -22,6 +22,7 @@ replay_queue_size: 64 # queue with replays from all the agents
 batch_queue_size: 64 # queue with batches given to learner
 num_episode_save: 100
 device: cuda
+agent_device: cpu
 save_reward_threshold: 1 # difference in best reward to save agent model
 
 # Network parameters

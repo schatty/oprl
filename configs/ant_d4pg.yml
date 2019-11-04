@@ -1,8 +1,8 @@
 # Environment parameters
 
-env: BipedalWalker-v2
-state_dim: 24
-action_dim: 4
+env: Ant-v2
+state_dim: 111
+action_dim: 8
 action_low: -1
 action_high: 1
 num_agents: 4
@@ -38,8 +38,8 @@ actor_learning_rate: 0.0005
 dense_size: 400 # size of the 2 hidden layers in networks
 final_layer_init: 0.003
 num_atoms: 51 # number of atoms in output layer of distributed critic
-v_min: -100.0 # lower bound of critic value output distribution
-v_max: 300.0 # upper bound of critic value output distribution
+v_min: 0 # lower bound of critic value output distribution
+v_max: 4000 # upper bound of critic value output distribution
 tau: 0.001 # parameter for soft target network updates
 
 # Miscellaneous

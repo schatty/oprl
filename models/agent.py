@@ -34,11 +34,14 @@ class Agent(object):
         log_path = f"{log_dir}/agent-{n_agent}"
         self.logger = Logger(log_path)
 
-    def update_actor_learner(self, learner_w_queue):
+    def update_actor_learner(self, learner_w_queue, training_on):
         """Update local actor to the actor from learner. """
-        if learner_w_queue.empty():
+        if not training_on.value:
             return
-        source = learner_w_queue.get()
+        try:
+            source = learner_w_queue.get_nowait()
+        except:
+            return
         target = self.actor
         for target_param, source_param in zip(target.parameters(), source):
             w = torch.tensor(source_param).float()
@@ -90,8 +93,12 @@ class Agent(object):
                     for (_, _, r_i) in self.exp_buffer:
                         discounted_reward += r_i * gamma
                         gamma *= self.config['discount_rate']
-                    if not replay_queue.full():
-                        replay_queue.put([state_0, action_0, discounted_reward, next_state, done, gamma])
+                    # We want to fill buffer only with form explorator
+                    if self.agent_type == "exploration":
+                        try:
+                            replay_queue.put_nowait([state_0, action_0, discounted_reward, next_state, done, gamma])
+                        except:
+                            print(f"Error putting in queue for agent {self.n_agent}")
 
                 state = next_state
 
@@ -104,7 +111,11 @@ class Agent(object):
                         for (_, _, r_i) in self.exp_buffer:
                             discounted_reward += r_i * gamma
                             gamma *= self.config['discount_rate']
-                        replay_queue.put([state_0, action_0, discounted_reward, next_state, done, gamma])
+                        if self.agent_type == "exploration":
+                            try:
+                                replay_queue.put_nowait([state_0, action_0, discounted_reward, next_state, done, gamma])
+                            except:
+                                print(f"Error putting in queue for agent {self.n_agent}")
                     break
 
                 num_steps += 1
@@ -124,7 +135,7 @@ class Agent(object):
 
             rewards.append(episode_reward)
             if self.agent_type == "exploration" and self.local_episode % self.config['update_agent_ep'] == 0:
-                self.update_actor_learner(learner_w_queue)
+                self.update_actor_learner(learner_w_queue, training_on)
 
         empty_torch_queue(replay_queue)
         print(f"Agent {self.n_agent} done.")
