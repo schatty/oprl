@@ -16,7 +16,7 @@ def load_xy(path):
     return data[:, 1:]
 
 
-def plot_data(paths, output_path, n_rows=1, n_cols=3):
+def plot_data(paths, output_path, n_rows=1, n_cols=3, smooth_len=5, lw=3):
     figure(num=0, figsize=(20, 5), dpi=100, facecolor='w', edgecolor='k')
     for i_subplot, env_name in enumerate(paths):
         ax = plt.subplot(n_rows, n_cols, i_subplot + 1)
@@ -24,9 +24,14 @@ def plot_data(paths, output_path, n_rows=1, n_cols=3):
 
         for model_name in paths[env_name]:
             data = load_xy(paths[env_name][model_name])
+
+            # Smooth reward
+            for i in range(data.shape[0] - 1, smooth_len, -1):
+                data[i, 1] = np.mean(data[i - smooth_len:i, 1])
+
             data = pd.DataFrame(data, columns=['step', 'reward'])
             data['model'] = model_name
-            sns.lineplot(data=data, x='step', y='reward', lw=2)
+            sns.lineplot(data=data, x='step', y='reward', lw=lw)
 
         ax.legend(labels=list(paths[env_name]), loc='lower right')
 
