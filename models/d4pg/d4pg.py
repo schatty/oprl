@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import queue
 
 from utils.utils import OUNoise, empty_torch_queue
 from utils.logger import Logger
@@ -136,9 +137,12 @@ class LearnerD4PG(object):
             )
 
         # Send updated learner to the queue
-        if not self.learner_w_queue.full():
-            params = [p.data.cpu().detach().numpy() for p in self.policy_net.parameters()]
-            self.learner_w_queue.put(params)
+        if update_step.value % 100 == 0:
+            try:
+                params = [p.data.cpu().detach().numpy() for p in self.policy_net.parameters()]
+                self.learner_w_queue.put(params)
+            except:
+                pass
 
         # Logging
         step = update_step.value
@@ -148,10 +152,11 @@ class LearnerD4PG(object):
 
     def run(self, training_on, batch_queue, replay_priority_queue, update_step):
         while update_step.value < self.num_train_steps:
-            if batch_queue.empty():
+            try:
+                batch = batch_queue.get_nowait()
+            except queue.Empty:
                 continue
 
-            batch = batch_queue.get()
             self._update_step(batch, replay_priority_queue, update_step)
             update_step.value += 1
 

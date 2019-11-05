@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import time
+import queue
 
 from utils.utils import OUNoise, empty_torch_queue
 from utils.logger import Logger
@@ -97,9 +98,12 @@ class LearnerD3PG(object):
             )
 
         # Send updated learner to the queue
-        if not self.learner_w_queue.full():
-            params = [p.data.to(self.config["agent_device"]).detach().numpy() for p in self.policy_net.parameters()]
-            self.learner_w_queue.put(params)
+        if update_step.value % 100 == 0:
+            try:
+                params = [p.data.to(self.config["agent_device"]).detach().numpy() for p in self.policy_net.parameters()]
+                self.learner_w_queue.put_nowait(params)
+            except:
+                pass
 
         # Logging
         step = update_step.value
@@ -109,10 +113,10 @@ class LearnerD3PG(object):
 
     def run(self, training_on, batch_queue, update_step):
         while update_step.value < self.num_train_steps:
-            if batch_queue.empty():
+            try:
+                batch = batch_queue.get_nowait()
+            except queue.Empty:
                 continue
-
-            batch = batch_queue.get()
             self._update_step(batch, update_step)
 
             update_step.value += 1

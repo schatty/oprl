@@ -3,6 +3,7 @@ import imageio
 from glob import glob
 import os
 import yaml
+from multiprocessing import Queue
 
 
 class OUNoise(object):

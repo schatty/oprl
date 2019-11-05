@@ -98,7 +98,7 @@ class Agent(object):
                         try:
                             replay_queue.put_nowait([state_0, action_0, discounted_reward, next_state, done, gamma])
                         except:
-                            print(f"Error putting in queue for agent {self.n_agent}")
+                            pass
 
                 state = next_state
 
@@ -115,7 +115,7 @@ class Agent(object):
                             try:
                                 replay_queue.put_nowait([state_0, action_0, discounted_reward, next_state, done, gamma])
                             except:
-                                print(f"Error putting in queue for agent {self.n_agent}")
+                               pass
                     break
 
                 num_steps += 1

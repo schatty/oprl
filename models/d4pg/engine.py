@@ -2,6 +2,9 @@ import copy
 from datetime import datetime
 from multiprocessing import set_start_method
 import torch.multiprocessing as torch_mp
+import multiprocessing as mp
+import queue
+from time import sleep
 try:
     set_start_method('spawn')
 except RuntimeError:
@@ -47,13 +50,18 @@ def sampler_worker(config, replay_queue, batch_queue, replay_priorities_queue, t
         if len(replay_buffer) < batch_size:
             continue
 
-        if not replay_priorities_queue.empty():
-            inds, weights = replay_priorities_queue.get()
+        try:
+            inds, weights = replay_priorities_queue.get_nowait()
             replay_buffer.update_priorities(inds, weights)
+        except queue.Empty:
+            pass
 
-        if not batch_queue.full():
+        try:
             batch = replay_buffer.sample(batch_size)
-            batch_queue.put(batch)
+            batch_queue.put_nowait(batch)
+        except:
+            sleep(0.1)
+            continue
 
         # Log data structures sizes
         step = update_step.value
@@ -103,15 +111,15 @@ class Engine(object):
 
         # Data structures
         processes = []
-        replay_queue = torch_mp.Queue(maxsize=256)
-        training_on = torch_mp.Value('i', 1)
-        update_step = torch_mp.Value('i', 0)
-        global_episode = torch_mp.Value('i', 0)
+        replay_queue = mp.Queue(maxsize=64)
+        training_on = mp.Value('i', 1)
+        update_step = mp.Value('i', 0)
+        global_episode = mp.Value('i', 0)
         learner_w_queue = torch_mp.Queue(maxsize=n_agents)
-        replay_priorities_queue = torch_mp.Queue(maxsize=256)
+        replay_priorities_queue = mp.Queue(maxsize=64)
 
         # Data sampler
-        batch_queue = torch_mp.Queue(maxsize=batch_queue_size)
+        batch_queue = mp.Queue(maxsize=batch_queue_size)
         p = torch_mp.Process(target=sampler_worker,
                              args=(config, replay_queue, batch_queue, replay_priorities_queue, training_on,
                                    global_episode, update_step, experiment_dir))
@@ -145,7 +153,7 @@ class Engine(object):
         for p in processes:
             p.start()
         for p in processes:
-            p.join()
+            p.join(1)
 
         print("End.")
 
