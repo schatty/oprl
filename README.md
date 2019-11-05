@@ -20,7 +20,7 @@ Run `train.py --config configs/pendulum_d4pg.yml`
 `python -m unittest discover`
 
 ## Results
-![plot](https://user-images.githubusercontent.com/23639048/68146326-d3580500-ff48-11e9-9cd6-739c8e6b7a2d.png)
+![plot](https://user-images.githubusercontent.com/23639048/68245464-0d4c0880-0028-11ea-9fac-6df210310ff2.png)
 
 ## Reproduce
 All results were obtained with configs in `configs` directory
