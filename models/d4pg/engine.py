@@ -153,7 +153,7 @@ class Engine(object):
         for p in processes:
             p.start()
         for p in processes:
-            p.join(1)
+            p.join()
 
         print("End.")
 
