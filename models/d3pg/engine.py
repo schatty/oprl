@@ -104,7 +104,7 @@ class Engine(object):
 
         # Data structures
         processes = []
-        replay_queue = mp.Queue(maxsize=64)
+        replay_queue = mp.Queue(maxsize=config["replay_queue_size"])
         training_on = mp.Value('i', 1)
         update_step = mp.Value('i', 0)
         global_episode = mp.Value('i', 0)
@@ -137,10 +137,10 @@ class Engine(object):
         processes.append(p)
 
         # Agents (exploration processes)
-        for i in range(1, n_agents):
+        for i in range(n_agents):
             p = torch_mp.Process(target=agent_worker,
-                                 args=(config, policy_net_cpu, learner_w_queue, global_episode, i, "exploration", experiment_dir,
-                                       training_on, replay_queue, update_step))
+                                 args=(config, copy.deepcopy(policy_net_cpu), learner_w_queue, global_episode,
+                                       i, "exploration", experiment_dir, training_on, replay_queue, update_step))
             processes.append(p)
 
         for p in processes:

@@ -65,7 +65,7 @@ def sampler_worker(config, replay_queue, batch_queue, replay_priorities_queue, t
 
         # Log data structures sizes
         step = update_step.value
-        logger.scalar_summary("data_stuct/global_episode", global_episode.value, step)
+        logger.scalar_summary("data_struct/global_episode", global_episode.value, step)
         logger.scalar_summary("data_struct/replay_queue", replay_queue.qsize(), step)
         logger.scalar_summary("data_struct/batch_queue", batch_queue.qsize(), step)
         logger.scalar_summary("data_struct/replay_buffer", len(replay_buffer), step)
@@ -111,12 +111,12 @@ class Engine(object):
 
         # Data structures
         processes = []
-        replay_queue = mp.Queue(maxsize=64)
+        replay_queue = mp.Queue(maxsize=config['replay_queue_size'])
         training_on = mp.Value('i', 1)
         update_step = mp.Value('i', 0)
         global_episode = mp.Value('i', 0)
         learner_w_queue = torch_mp.Queue(maxsize=n_agents)
-        replay_priorities_queue = mp.Queue(maxsize=64)
+        replay_priorities_queue = mp.Queue(maxsize=config['replay_queue_size'])
 
         # Data sampler
         batch_queue = mp.Queue(maxsize=batch_queue_size)
@@ -144,10 +144,10 @@ class Engine(object):
         processes.append(p)
 
         # Agents (exploration processes)
-        for i in range(1, n_agents):
+        for i in range(n_agents):
             p = torch_mp.Process(target=agent_worker,
-                                 args=(config, policy_net_cpu, learner_w_queue, global_episode, i, "exploration", experiment_dir,
-                                       training_on, replay_queue, update_step))
+                                 args=(config, copy.deepcopy(policy_net_cpu), learner_w_queue, global_episode, 
+                                       i, "exploration", experiment_dir, training_on, replay_queue, update_step))
             processes.append(p)
 
         for p in processes:

@@ -2,6 +2,7 @@ import shutil
 import os
 import time
 from collections import deque
+from copy import deepcopy
 import torch
 
 from utils.utils import OUNoise, make_gif, empty_torch_queue
@@ -31,7 +32,7 @@ class Agent(object):
         print("Agent ", n_agent, self.actor.device)
 
         # Logger
-        log_path = f"{log_dir}/agent-{n_agent}"
+        log_path = f"{log_dir}/agent-{agent_type}-{n_agent}"
         self.logger = Logger(log_path)
 
     def update_actor_learner(self, learner_w_queue, training_on):
@@ -46,7 +47,6 @@ class Agent(object):
         for target_param, source_param in zip(target.parameters(), source):
             w = torch.tensor(source_param).float()
             target_param.data.copy_(w)
-        del source
 
     def run(self, training_on, replay_queue, learner_w_queue, update_step):
         # Initialise deque buffer to store experiences for N-step returns
@@ -76,7 +76,10 @@ class Agent(object):
                 else:
                     action = action.detach().cpu().numpy().flatten()
                 next_state, reward, done = self.env_wrapper.step(action)
+                num_steps += 1
 
+                if num_steps == self.max_steps:
+                    done = False
                 episode_reward += reward
 
                 state = self.env_wrapper.normalise_state(state)
@@ -118,17 +121,15 @@ class Agent(object):
                                pass
                     break
 
-                num_steps += 1
-
             # Log metrics
             step = update_step.value
-            self.logger.scalar_summary("agent/reward", episode_reward, step)
-            self.logger.scalar_summary("agent/episode_timing", time.time() - ep_start_time, step)
+            self.logger.scalar_summary(f"agent_{self.agent_type}/reward", episode_reward, step)
+            self.logger.scalar_summary(f"agent_{self.agent_type}/episode_timing", time.time() - ep_start_time, step)
 
             # Saving agent
             reward_outperformed = episode_reward - best_reward > self.config["save_reward_threshold"]
             time_to_save = self.local_episode % self.num_episode_save == 0
-            if self.n_agent == 0 and (time_to_save or reward_outperformed):
+            if self.agent_type == "exploitation" and (time_to_save or reward_outperformed):
                 if episode_reward > best_reward:
                     best_reward = episode_reward
                 self.save(f"local_episode_{self.local_episode}_reward_{best_reward:4f}")

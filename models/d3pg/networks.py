@@ -6,7 +6,7 @@ import torch.nn.functional as F
 class ValueNetwork(nn.Module):
     """Critic - return Q value from given states and actions. """
 
-    def __init__(self, num_states, num_actions, hidden_size, init_w=3e-3, device='cuda'):
+    def __init__(self, num_states, num_actions, hidden_size, device='cuda'):
         """
         Args:
             num_states (int): state dimension
@@ -16,13 +16,9 @@ class ValueNetwork(nn.Module):
         """
         super(ValueNetwork, self).__init__()
 
-        self.bn1 = nn.BatchNorm1d(num_actions + num_states)
         self.linear1 = nn.Linear(num_states + num_actions, hidden_size)
         self.linear2 = nn.Linear(hidden_size, hidden_size)
         self.linear3 = nn.Linear(hidden_size, 1)
-
-        self.linear3.weight.data.uniform_(-init_w, init_w)
-        self.linear3.bias.data.uniform_(-init_w, init_w)
 
         self.to(device)
 
@@ -37,7 +33,7 @@ class ValueNetwork(nn.Module):
 class PolicyNetwork(nn.Module):
     """Actor - return action value given states. """
 
-    def __init__(self, num_states, num_actions, hidden_size, init_w=3e-3, device='cuda'):
+    def __init__(self, num_states, num_actions, hidden_size, device='cuda'):
         """
         Args:
             num_states (int): state dimension
@@ -51,9 +47,6 @@ class PolicyNetwork(nn.Module):
         self.linear1 = nn.Linear(num_states, hidden_size)
         self.linear2 = nn.Linear(hidden_size, hidden_size)
         self.linear3 = nn.Linear(hidden_size, num_actions)
-
-        self.linear3.weight.data.uniform_(-init_w, init_w)
-        self.linear3.bias.data.uniform_(-init_w, init_w)
 
         self.to(device)
 

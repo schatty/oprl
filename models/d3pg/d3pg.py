@@ -112,11 +112,13 @@ class LearnerD3PG(object):
         self.logger.scalar_summary("learner/update_time", time.time() - update_time, step)
 
     def run(self, training_on, batch_queue, update_step):
+        torch.set_num_threads(4)
         while update_step.value < self.num_train_steps:
             try:
                 batch = batch_queue.get_nowait()
             except queue.Empty:
                 continue
+
             self._update_step(batch, update_step)
 
             update_step.value += 1
