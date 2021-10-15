@@ -140,7 +140,7 @@ class LearnerD4PG(object):
         if update_step.value % 100 == 0:
             try:
                 params = [p.data.cpu().detach().numpy() for p in self.policy_net.parameters()]
-                self.learner_w_queue.put(params)
+                self.learner_w_queue.put_nowait(params)
             except:
                 pass
 
@@ -151,6 +151,7 @@ class LearnerD4PG(object):
         self.logger.scalar_summary("learner/learner_update_timing", time.time() - update_time, step)
 
     def run(self, training_on, batch_queue, replay_priority_queue, update_step):
+        torch.set_num_threads(4)
         while update_step.value < self.num_train_steps:
             try:
                 batch = batch_queue.get_nowait()
