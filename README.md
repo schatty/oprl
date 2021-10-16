@@ -1,8 +1,9 @@
 # D4PG-pytorch
 
 PyTorch implementation of Distributed Distributional Deterministic Policy Gradients (https://arxiv.org/abs/1804.08617).
-<img width="865" alt="arch" src="https://user-images.githubusercontent.com/23639048/62874932-bedde500-bd2a-11e9-82e3-6b4899b4e6d2.png">
-
+<p align="center">
+<img width="554" alt="d4pg_arch" src="https://user-images.githubusercontent.com/23639048/137602300-f2763ef1-2b67-4f76-aa8b-232afaa08a23.png">
+</p>
 Implementation was tested on environments from OpenAI Gym.
 
 # About
@@ -14,19 +15,18 @@ D4PG and D3PG implementations with following features
 Project was tested on Ubuntu 18.04, Intel i5 with 4 cores, Nvidia GTX 1080Ti
 
 # Usage
-Run `train.py --config configs/pendulum_d4pg.yml`
+Run `train.py --config configs/d4pg/walker2d_d4pg.yml`
 
 # Tests
 `python -m unittest discover`
 
 ## Results
-![plot](https://user-images.githubusercontent.com/23639048/68245464-0d4c0880-0028-11ea-9fac-6df210310ff2.png)
+<img width="1253" alt="d4pg_results2" src="https://user-images.githubusercontent.com/23639048/137603098-dbc42798-af5e-4b2c-9aba-90c99b5db109.png">
 
 ## Reproduce
 All results were obtained with configs in `configs` directory
 
 ## References
 
-* DDPG [https://arxiv.org/abs/1509.02971]
-* Distributional Perspective on RL [https://arxiv.org/abs/1804.08617]
-* D4PG [https://arxiv.org/abs/1804.08617]
+* Continuous control with deep reinforcement learning, [https://arxiv.org/abs/1509.02971]
+* Distributed Distributional Deterministic Policy Gradients [https://arxiv.org/abs/1804.08617]
