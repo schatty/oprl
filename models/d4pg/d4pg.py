@@ -30,6 +30,7 @@ class LearnerD4PG(object):
         self.batch_size = config['batch_size']
         self.tau = config['tau']
         self.gamma = config['discount_rate']
+        self.n_step_return = config["n_step_returns"]
         self.log_dir = log_dir
         self.prioritized_replay = config['replay_memory_prioritized']
         self.learner_w_queue = learner_w_queue
@@ -88,7 +89,7 @@ class LearnerD4PG(object):
         target_z_projected = _l2_project(next_distr_v=target_value,
                                          rewards_v=reward,
                                          dones_mask_t=done,
-                                         gamma=self.gamma ** 5,
+                                         gamma=self.gamma ** self.n_step_return,
                                          n_atoms=self.num_atoms,
                                          v_min=self.v_min,
                                          v_max=self.v_max,
