@@ -9,7 +9,7 @@ class TestsBipedalWalker(unittest.TestCase):
         CONFIG_PATH = 'tests/config_test.yml'
         config = read_config(CONFIG_PATH)
 
-        config['env'] = 'BipedalWalker-v2'
+        config['env'] = 'BipedalWalker-v3'
         config['model'] = 'ddpg'
         config['state_dim'] = 24
         config['action_dim'] = 4
@@ -21,7 +21,7 @@ class TestsBipedalWalker(unittest.TestCase):
         CONFIG_PATH = 'tests/config_test.yml'
         config = read_config(CONFIG_PATH)
 
-        config['env'] = 'BipedalWalker-v2'
+        config['env'] = 'BipedalWalker-v3'
         config['model'] = 'd4pg'
         config['state_dim'] = 24
         config['action_dim'] = 4
