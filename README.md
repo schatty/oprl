@@ -15,7 +15,7 @@ D4PG and D3PG implementations with following features
 Project was tested on Ubuntu 18.04, Intel i5 with 4 cores, Nvidia GTX 1080Ti
 
 # Usage
-Run `train.py --config configs/d4pg/walker2d_d4pg.yml`
+Run `python train.py --config configs/openai/d4pg/walker2d_d4pg.yml`
 
 # Tests
 `python -m unittest discover`
