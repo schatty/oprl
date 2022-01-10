@@ -21,8 +21,18 @@ Run `train.py --config configs/d4pg/walker2d_d4pg.yml`
 `python -m unittest discover`
 
 ## Results
-<img width="1253" alt="d4pg_results2" src="https://user-images.githubusercontent.com/23639048/137603098-dbc42798-af5e-4b2c-9aba-90c99b5db109.png">
+Configs for reproducing curves below can be found in `configs` directory (num parallel agents = 4).
 
+__OpenAI Mujoco__
+<p align="center">
+<img width="1253" alt="d4pg_results2" src="https://user-images.githubusercontent.com/23639048/137603098-dbc42798-af5e-4b2c-9aba-90c99b5db109.png">
+</p>
+  
+__DMControl__
+<p align="center">
+<img width="1512" alt="dmc_d4pg" src="https://user-images.githubusercontent.com/23639048/148819008-4a601531-7411-4189-9908-c93df21ceb4c.png">
+</p>
+  
 ## Reproduce
 All results were obtained with configs in `configs` directory
 
