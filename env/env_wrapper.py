@@ -12,7 +12,6 @@ class EnvWrapper:
     def __init__(self, env_name):
         self.env_name = env_name
         open_ai_env = len([pref for pref in OPENAI_MUJOCO_PREFIX if pref in env_name]) > 0
-        print("open_ai_env: ", open_ai_env)
         if open_ai_env:
             self.env = gym.make(self.env_name)
         else:
