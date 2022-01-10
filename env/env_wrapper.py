@@ -1,10 +1,22 @@
 import gym
+import dmc2gym
+
+
+OPENAI_MUJOCO_PREFIX = [
+    "Walker", "HalfCheetah", "Swimmer", "InvertedPendulum", "InvertedDoublePendulum",
+    "Hopper", "Humanoid", "Reacher", "Ant"
+]
 
 
 class EnvWrapper:
     def __init__(self, env_name):
         self.env_name = env_name
-        self.env = gym.make(self.env_name)
+        open_ai_env = len([pref for pref in OPENAI_MUJOCO_PREFIX if pref in env_name]) > 0
+        if open_ai_env:
+            self.env = gym.make(self.env_name)
+        else:
+            domain, task = env_name.split("-")
+            self.env = dmc2gym.make(domain_name=domain, task_name=task)
 
     def reset(self):
         state = self.env.reset()
