@@ -5,50 +5,30 @@ import argparse
 from trainers.base_trainer import BaseTrainer
 from algos.ddpg import DDPG
 from utils.logger import Logger
+from utils.config import load_config
 from env import DMControlEnv
-print("Imports OK.")
 
 
 def parse_args():
-
     parser = argparse.ArgumentParser(description='Run training')
     parser.add_argument("--config", type=str, help="Path to the config file.")
-
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
+    config = load_config(args.config)    
+    print("TRAIN: ", config.train)
 
-
-    ENV = "walker-walk"
-    ALGO = "DDPG"
-    LOGDIR = "logs"
-    NUM_STEPS = 10000
-    EVAL_INTERVAL = 2000
-    LOG_EVERY=1000
-    SEED = 0
-    DEVICE = "cpu"
-    ESTIMATE_Q_EVERY = 5000
-    VISUALISE_EVERY = 10000
-    SAVE_BUFFER = False
-
-    config = dict(
-        env=ENV,
-        num_steps=int(100_000),
-        algo=ALGO,
-        device="cpu",
-        seed=SEED,
-    )
-
-    env = DMControlEnv(ENV, seed=SEED)
+    env = DMControlEnv(config.train.env, seed=config.train.seed)
 
     def make_test_env(seed: int):
-        return DMControlEnv(ENV, seed)
+        return DMControlEnv(config.train.env, seed)
 
     time = datetime.now().strftime("%Y-%m-%d_%H_%M")
     log_dir = os.path.join(
-        LOGDIR, ALGO, f"{ALGO}-env_{ENV}-seed{SEED}-{time}")
+        config.train.log_dir, config.train.algo, 
+        f"{config.train.algo}-env_{config.train.env}-seed{config.train.seed}-{time}")
     logger = Logger(log_dir)
     print("LOGDIR: ", log_dir)
 
@@ -60,8 +40,8 @@ if __name__ == "__main__":
     algo = DDPG(
         state_shape=STATE_SHAPE,
         action_shape=ACTION_SHAPE,
-        device=DEVICE,
-        seed=SEED,
+        device=config.train.device,
+        seed=config.train.seed,
         logger=logger
     )
 
@@ -71,22 +51,16 @@ if __name__ == "__main__":
         env=env,
         make_env_test=make_test_env,
         algo=algo,
-        num_steps=NUM_STEPS,
-        eval_interval=EVAL_INTERVAL,
-        device=DEVICE,
-        save_buffer_every=SAVE_BUFFER,
-        visualise_every=VISUALISE_EVERY,
-        estimate_q_every=ESTIMATE_Q_EVERY,
-        stdout_log_every=LOG_EVERY,
-        seed=SEED,
+        num_steps=config.train.num_steps,
+        eval_interval=config.train.eval_every,
+        device=config.train.device,
+        save_buffer_every=config.train.save_buffer,
+        visualise_every=config.train.visualise_every,
+        estimate_q_every=config.train.estimate_q_every,
+        stdout_log_every=config.train.log_every,
+        seed=config.train.seed,
         logger=logger,
     )
-
-    '''
-    config = read_config(args.config)
-    trainer = config.make_trainer()
-
-    '''
 
     print("Training starts...")
     trainer.train()
