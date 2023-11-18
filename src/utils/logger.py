@@ -1,4 +1,5 @@
 import os
+import numpy as np
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -16,6 +17,14 @@ class Logger:
         for tag_keyword in self._tags_to_log_file:
             if tag_keyword in tag:
                 self._log_scalar_to_file(tag, value, step)
+
+    def log_video(self, tag: str, imgs, step: int):
+        # TODO: Log to TensorBoard
+        os.makedirs(os.path.join(self._log_dir, "images"))
+        fn = os.path.join(self._log_dir, "images", f"{tag}_step_{step}.npz")
+        with open(fn, "wb") as f:
+            np.save(f, imgs)
+        print("Video logged!")
 
     def _log_scalar_to_file(self, tag: str, val: float, step: int):
         fn = os.path.join(self._log_dir, f"{tag}.log")

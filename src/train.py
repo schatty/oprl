@@ -24,13 +24,13 @@ if __name__ == "__main__":
     ENV = "walker-walk"
     ALGO = "DDPG"
     LOGDIR = "logs"
-    NUM_STEPS = 100000
+    NUM_STEPS = 10000
     EVAL_INTERVAL = 2000
     LOG_EVERY=1000
     SEED = 0
     DEVICE = "cpu"
     ESTIMATE_Q_EVERY = 5000
-    VISUALISE_EVERY = 5000
+    VISUALISE_EVERY = 10000
     SAVE_BUFFER = False
 
     config = dict(
@@ -75,7 +75,7 @@ if __name__ == "__main__":
         eval_interval=EVAL_INTERVAL,
         device=DEVICE,
         save_buffer_every=SAVE_BUFFER,
-        visualize_every=VISUALISE_EVERY,
+        visualise_every=VISUALISE_EVERY,
         estimate_q_every=ESTIMATE_Q_EVERY,
         stdout_log_every=LOG_EVERY,
         seed=SEED,

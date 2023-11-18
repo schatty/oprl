@@ -1,3 +1,4 @@
+import torch
 import numpy as np
 
 from trainers.buffers.episodic_buffer import EpisodicReplayBuffer
@@ -7,7 +8,7 @@ class BaseTrainer:
 
     def __init__(self, state_shape=None, action_shape=None, env=None, make_env_test=None, algo=None, buffer_size=int(1e6),
                  gamma=0.99, device=None, num_steps=int(1e6), start_steps=int(10e3), batch_size=128,
-                 eval_interval=int(2e3), num_eval_episodes=10, save_buffer_every=0, visualize_every=0,
+                 eval_interval=int(2e3), num_eval_episodes=10, save_buffer_every=0, visualise_every=0,
                  estimate_q_every=0, stdout_log_every=int(1e5), seed=0, logger=None):
         """
         Args:
@@ -24,7 +25,7 @@ class BaseTrainer:
             batch_size: Batch-size.
             eval_interval: Number of env step after which perform evaluation.
             save_buffer_every: Number of env steps after which save replay buffer.
-            visualize_every: Number of env steps after which perform vizualization.
+            visualise_every: Number of env steps after which perform vizualisation.
             stdout_log_every: Number of evn steps after which log info to stdout.
             seed: Random seed.
         """
@@ -34,7 +35,7 @@ class BaseTrainer:
         self.gamma = gamma
         self.device = device
         self.save_buffer_every = save_buffer_every
-        self.visualize_every = visualize_every
+        self.visualize_every = visualise_every
         self.estimate_q_every = estimate_q_every
         self.stdout_log_every = stdout_log_every
         self.logger = logger
@@ -87,10 +88,9 @@ class BaseTrainer:
                 self.logger.log_scalar("trainer/buffer_last_ep_len", self.buffer.get_last_ep_len(), env_step)
 
             if self.visualize_every > 0 and env_step % self.visualize_every == 0:
-                # imgs = self.visualize_policy()
-                # if imgs is not None:
-                #     wandb.log({"video": wandb.Video(imgs, fps=25, format="gif"), "env_step": env_step})
-                pass
+                imgs = self.visualise_policy()  # [T, W, H, C]
+                if imgs is not None:
+                    self.logger.log_video("eval_policy", imgs, env_step)
 
             if self.save_buffer_every > 0 and env_step % self.save_buffer_every == 0:
                 self.buffer.save(f"{self.log_dir}/buffers/buffer_step_{env_step}.pickle")
@@ -126,21 +126,24 @@ class BaseTrainer:
         mean_return = np.mean(returns)
         return mean_return
 
-    def visualize_policy(self):
+    def visualise_policy(self):
+        """
+        returned shape: [N, C, W, H]
+        """
+        env = self.make_env_test(seed=self.seed)
         try:
             imgs = []
-            state, _ = self.env_test.reset(seed=self.seed)
+            state, _ = env.reset(seed=self.seed)
             done = False
             while not done:
-                img = self.env_test.render(mode="rgb_array")
-                img = np.moveaxis(img, (0, 1, 2), (1, 2, 0))
-                img = np.expand_dims(img, 0)
+                img = env.render()
                 imgs.append(img)
                 action = self.algo.exploit(state)
-                state, _, done, _ = self.env_test.step(action)
+                state, _, terminated, truncated, _ = env.step(action)
+                done = terminated or truncated
             return np.concatenate(imgs)
         except Exception as e:
-            print(f"Failed to visualize a policy: {e}")
+            print(f"Failed to visualise a policy: {e}")
             return None
 
     def estimate_true_q(self, eval_episodes=10):
