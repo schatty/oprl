@@ -2,7 +2,7 @@ import numpy as np
 import imageio
 from glob import glob
 import os
-import yaml
+import shutil
 from multiprocessing import Queue
 
 
@@ -52,20 +52,6 @@ def make_gif(source_dir, output):
     imageio.mimsave(output, images)
 
 
-def read_config(path):
-    """
-    Return python dict from .yml file.
-
-    Args:
-        path (str): path to the .yml config.
-
-    Returns (dict): configuration object.
-    """
-    with open(path, 'r') as ymlfile:
-        cfg = yaml.load(ymlfile)
-    return cfg
-
-
 def empty_torch_queue(q):
     while True:
         try:
@@ -74,3 +60,10 @@ def empty_torch_queue(q):
         except:
             break
     q.close()
+
+
+def copy_exp_dir(log_dir: str):
+    cur_dir = os.path.join(os.getcwd(), "src")
+    dest_dir = os.path.join(log_dir, "src")
+    shutil.copy(cur_dir, dest_dir)
+    print(f"Source copied into {dest_dir}")

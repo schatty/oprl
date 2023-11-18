@@ -1,7 +1,15 @@
+import shutil
 import os
 import numpy as np
 
 from torch.utils.tensorboard import SummaryWriter
+
+
+def copy_exp_dir(log_dir: str):
+    cur_dir = os.path.join(os.getcwd(), "src")
+    dest_dir = os.path.join(log_dir, "src")
+    shutil.copytree(cur_dir, dest_dir)
+    print(f"Source copied into {dest_dir}")
 
 
 class Logger:
@@ -10,6 +18,8 @@ class Logger:
 
         self._log_dir = logdir
         self._tags_to_log_file = ("reward", )
+
+        copy_exp_dir(logdir)
 
     def log_scalar(self, tag: str, value: float, step: int):
         self.writer.add_scalar(tag, value, step)

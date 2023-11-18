@@ -12,12 +12,14 @@ from env import DMControlEnv
 def parse_args():
     parser = argparse.ArgumentParser(description='Run training')
     parser.add_argument("--config", type=str, help="Path to the config file.")
+    parser.add_argument("--env", type=str, help="Name of the environment.")
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
     config = load_config(args.config)    
+    config.train.env = args.env
     print("TRAIN: ", config.train)
 
     env = DMControlEnv(config.train.env, seed=config.train.seed)
@@ -31,7 +33,6 @@ if __name__ == "__main__":
         f"{config.train.algo}-env_{config.train.env}-seed{config.train.seed}-{time}")
     logger = Logger(log_dir)
     print("LOGDIR: ", log_dir)
-
     
     STATE_SHAPE = env.observation_space.shape
     ACTION_SHAPE = env.action_space.shape

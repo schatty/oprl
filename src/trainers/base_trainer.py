@@ -96,11 +96,12 @@ class BaseTrainer:
                 self.buffer.save(f"{self.log_dir}/buffers/buffer_step_{env_step}.pickle")
 
             if self.estimate_q_every > 0 and env_step % self.estimate_q_every == 0:
-                q_est = self.estimate_true_q()
+                q_true = self.estimate_true_q()
                 q_critic = self.estimate_critic_q()
-                if q_est is not None:
-                    self.logger.log_scalar("trainer/Q-estimate", q_est,  env_step)
+                if q_true is not None:
+                    self.logger.log_scalar("trainer/Q-estimate", q_true,  env_step)
                     self.logger.log_scalar("trainer/Q-critic", q_critic, env_step)
+                    self.logger.log_scalar("trainer/Q_asb_diff", q_critic - q_true, env_step)
 
             if env_step % self.stdout_log_every == 0:
                 perc = int(env_step / self.num_steps * 100)
@@ -147,34 +148,22 @@ class BaseTrainer:
             return None
 
     def estimate_true_q(self, eval_episodes=10):
-        """Estimates true Q-value via launching given policy from sampled state until
-        the end of an episode. """
-
-        # TODO: Works only for some envs of OpenAI
         try:
             qs = []
-            for _ in range(eval_episodes):
-                # TODO: add seed
-                self.env_test.reset()
+            for i_eval in range(eval_episodes):
+                env = self.make_env_test(seed = self.seed * 100 + i_eval)
+                state, _ = env.reset()
 
-                states, _, rewards, _, _ = self.buffer.sample(1)
-                state, reward = states[0].cpu().numpy(), rewards[0].cpu().numpy()
-
-                qpos = state[:self.env_test.model.nq - 1]
-                qvel = state[self.env_test.model.nq - 1:]
-                qpos = np.concatenate([[0], qpos])
-
-                self.env_test.set_state(qpos, qvel)
-
-                q = reward
+                q = 0
                 s_i = 1
                 while True:
-                    action = self.algo.exploit(np.array(state))
-                    state, r, d, _ = self.env_test.step(action)
+                    action = self.algo.exploit(state)
+                    state, r, terminated, truncated, _ = env.step(action)
                     q += r * self.gamma ** s_i
-                    if d or s_i == self.env_test._max_episode_steps:
-                        break
                     s_i += 1
+                    if terminated or truncated:
+                        break
+
                 qs.append(q)
 
             return np.mean(qs)
@@ -182,9 +171,18 @@ class BaseTrainer:
             print(f"Failed to estimate Q-value: {e}")
             return None
 
-    def estimate_critic_q(self, num_samples=100):
-        states, actions, _, _, _ = self.buffer.sample(num_samples)
-        q = self.algo.critic(states, actions)
-        if isinstance(q, (list, tuple)):
-            q = q[0]
-        return q.detach().mean().item()
+    def estimate_critic_q(self, num_episodes=10):
+        qs = [] 
+        for i_eval in range(num_episodes):
+            env = self.make_env_test(seed=self.seed * 100 + i_eval)
+
+            state, _ = env.reset()
+            state = torch.tensor(state).unsqueeze(0).float()
+            action = self.algo.exploit(state)
+            action = torch.tensor(action).unsqueeze(0).float()
+ 
+            q = self.algo.critic(state, action)
+            q = q.item()
+            qs.append(q)
+
+        return np.mean(qs)
