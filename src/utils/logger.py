@@ -1,3 +1,4 @@
+import json
 import shutil
 import os
 import numpy as np
@@ -12,14 +13,21 @@ def copy_exp_dir(log_dir: str):
     print(f"Source copied into {dest_dir}")
 
 
+def save_json_config(config: str, path: str):
+    with open(path, "w") as f:
+        json.dump(config, f)
+
+
 class Logger:
-    def __init__(self, logdir: str):
+    def __init__(self, logdir: str, config: str):
         self.writer = SummaryWriter(logdir)
 
         self._log_dir = logdir
         self._tags_to_log_file = ("reward", )
 
         copy_exp_dir(logdir)
+        save_json_config(config, os.path.join(logdir, "config.json"))
+
 
     def log_scalar(self, tag: str, value: float, step: int):
         self.writer.add_scalar(tag, value, step)
