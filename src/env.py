@@ -68,7 +68,5 @@ def make_env(name: str, seed: int):
     Args:
         name: Environment name.
     """
-    domain, task = name.split("-")
-    env = DMControlEnv(domain_name=domain, task_name=task, seed=seed)
+    return DMControlEnv(name, seed=seed)
 
-    return env
