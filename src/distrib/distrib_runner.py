@@ -89,6 +89,9 @@ def policy_update_worker(make_algo, make_buffer):
 
     if method_frame:
         print(method_frame)
+        data = pickle.loads(body)
+        print("Looking at data: ", type(data))
+        print(len(data))
         print("Got body: ", type(body))
         data = pickle.loads(body)
         print("Looking at data: ", type(data))
