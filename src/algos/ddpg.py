@@ -1,6 +1,8 @@
 from copy import deepcopy
+from collections import OrderedDict
 
 import numpy as np
+import numpy.typing as npt
 import torch
 from torch import nn
 from torch.optim import Adam
@@ -14,7 +16,7 @@ from .utils import initialize_weight
 class DeterministicPolicy(nn.Module):
 
     def __init__(self, state_shape, action_shape, hidden_units=(256, 256),
-                 hidden_activation=nn.ReLU(inplace=True)):
+                 hidden_activation=nn.ReLU(inplace=True), device: str = "cpu"):
         super().__init__()
 
         self.mlp = MLP(
@@ -24,8 +26,14 @@ class DeterministicPolicy(nn.Module):
             hidden_activation=hidden_activation,
         ).apply(initialize_weight)
 
+        self._device = device
+
     def forward(self, states):
         return torch.tanh(self.mlp(states))
+
+    def exploit(self, state: npt.ArrayLike) -> npt.ArrayLike:
+        state = torch.FloatTensor(state.reshape(1, -1)).to(self._device)
+        return self.forward(state).cpu().data.numpy().flatten()
 
 
 class DDPG:
@@ -107,3 +115,6 @@ class DDPG:
 
         for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data) 
+
+    def get_policy_state_dict(self) -> OrderedDict:
+        return self.actor.state_dict()

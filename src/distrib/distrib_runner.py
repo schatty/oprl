@@ -4,6 +4,7 @@ from multiprocessing import Process
 import pika
 
 import torch
+import numpy as np
 
 
 class Queue:
@@ -17,7 +18,6 @@ class Queue:
         self.channel.queue_declare(queue=name)
 
     def push(self, data) -> None:
-        print("Pushing type of data: ", type(data))
         self.channel.basic_publish(exchange="", routing_key=self._name, body=data)
 
     def pop(self) -> bytes | None:
@@ -29,51 +29,63 @@ class Queue:
 
 
 def env_worker(make_env, make_policy):
-    env = make_env("walker-walk", seed=0)
+    env = make_env("cartpole-balance", seed=0)
     print("Env created.")
 
     policy = make_policy()
     print("Policy created.")
 
-    q = Queue("env_0")
+    q_env = Queue("env_0")
+    q_policy = Queue("policy")
     print("Queue created.")
 
     episodes = []
     
-    for i_ep in range(3):
-        ep_step = 0
-        start_steps = 1000
+    total_env_step = 0
+    start_steps = 1000
+    while True:
         episode = []
-
         state, _ = env.reset()
         for env_step in range(1000):
-            ep_step += 1
-            if env_step <= start_steps:
+            if total_env_step <= start_steps:
                 action = env.sample_action()
             else:
                 action = policy.exploit(state)
 
             next_state, reward, terminated, truncated, _ = env.step(action)
-
             episode.append([state, action, reward, terminated, next_state])
 
             if terminated or truncated:
                 break
             state = next_state
+            total_env_step += 1
 
-        q.push(pickle.dumps(episode))
-        print(f"Episode {i_ep} sent!")
+        q_env.push(pickle.dumps(episode))
+        # print(f"Episode {i_ep} sent!")
+        
+        while True:
+            data = q_policy.pop()
+            if data is None:
+                print("Waiting for the policy..")
+                time.sleep(2.0)
+                continue
+        
+            policy.load_state_dict(pickle.loads(data))
+            # print("New policy in agent loaded")
+            break
 
     print("Episode by env worker is done.")
 
 
-def policy_update_worker(make_algo, make_buffer):
+def policy_update_worker(make_algo, make_env_test, make_buffer):
+    EPOCHS = 500
     algo = make_algo()
     print("Algo created.")
     buffer = make_buffer()
     print("Buffer created.")
 
-    q = Queue("env_0")
+    q_env = Queue("env_0")
+    q_policy = Queue("policy")
     print("Learner queue created.")
 
     batch_size = 128
@@ -81,24 +93,53 @@ def policy_update_worker(make_algo, make_buffer):
     print("Warming up the learner...")
     time.sleep(2.0)
 
-    while True:
-        print("basic_get")
-        data = q.pop()
+    for i_epoch in range(EPOCHS):
+        print("Epoch ", i_epoch)
+        data = q_env.pop()
         if data:
             episode = pickle.loads(data)
             buffer.add_episode(episode)
-            print("Episode added to buffer OK.")
-
-        time.sleep(1)
-
-        if len(buffer) < batch_size:
-            print("Buffer too small, not performing update")
+            # print("Episode added to buffer OK.")
+        else:
+            print("Waiting for the env data...")
+            time.sleep(1)
             continue
-        batch = buffer.sample(batch_size)
-        algo.update(batch)
-        print("Upadate performed OK.")
+
+        if i_epoch > 5:
+            for i in range(100):
+                batch = buffer.sample(batch_size)
+                algo.update(batch)
+                if i % 10 == 0:
+                    print(f"\tUpdating {i}")
+            # print("Upadate performed OK.")
         
-        # TODO: Send updated policy to agents
-        time.sleep(1)
+        policy_state_dict = algo.get_policy_state_dict()
+        q_policy.push(pickle.dumps(policy_state_dict))
+        # print("Pushing policy")
+    
+        if True:
+            mean_reward = evaluate(algo, make_env_test)
+            algo.logger.log_scalar("trainer/ep_reward", mean_reward, i_epoch)
+
     print("Update by policy update worker done.")
+
+
+def evaluate(algo, make_env_test, num_eval_episodes: int = 5, seed: int = 0):
+    returns = []
+    for i_ep in range(num_eval_episodes):
+        env_test = make_env_test(seed + i_ep)
+        state, _ = env_test.reset(seed + i_ep)
+
+        episode_return = 0.0
+        terminated, truncated = False, False
+
+        while not (terminated or truncated):
+            action = algo.exploit(state)
+            state, reward, terminated, truncated, _ = env_test.step(action)
+            episode_return += reward
+
+        returns.append(episode_return)
+
+    mean_return = np.mean(returns)
+    return mean_return
 
