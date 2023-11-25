@@ -177,9 +177,10 @@ class BaseTrainer:
             env = self.make_env_test(seed=self.seed * 100 + i_eval)
 
             state, _ = env.reset()
-            state = torch.tensor(state).unsqueeze(0).float()
             action = self.algo.exploit(state)
-            action = torch.tensor(action).unsqueeze(0).float()
+
+            state = torch.tensor(state).unsqueeze(0).float().to(self.device)
+            action = torch.tensor(action).unsqueeze(0).float().to(self.device)
  
             q = self.algo.critic(state, action)
             q = q.item()

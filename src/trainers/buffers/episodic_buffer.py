@@ -39,6 +39,7 @@ class EpisodicReplayBuffer:
         self.actions_for_std = torch.empty((100, *action_shape), dtype=dtype, device=device)
         self.actions_for_std_cnt = 0
 
+    # TODO: rename to add
     def append(self, state, action, reward, done, episode_done=None):
         """
         Args:
@@ -59,10 +60,21 @@ class EpisodicReplayBuffer:
         self.ep_lens[self.ep_pointer] += 1
         self.cur_size = min(self.cur_size + 1, self.buffer_size)
         if episode_done:
+            self._inc_episode()
+
+    def _inc_episode(self):
             self.ep_pointer = (self.ep_pointer + 1) % self.max_episodes
             self.cur_episodes = min(self.cur_episodes + 1, self.max_episodes)
             self.cur_size -= self.ep_lens[self.ep_pointer]
             self.ep_lens[self.ep_pointer] = 0
+
+    def add_episode(self, episode):
+        for (s, a, r, d, s_) in episode:
+            self.append(s, a, r, d, episode_done=d)
+            if d:
+                break
+        else:
+            self._inc_episode()
 
     def _inds_to_episodic(self, inds):
         start_inds = np.cumsum([0] + self.ep_lens[:self.cur_episodes - 1])        

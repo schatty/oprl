@@ -1,6 +1,7 @@
 from copy import deepcopy
 
 import numpy as np
+import numpy.typing as npt
 import torch
 from torch import nn
 from torch.optim import Adam
@@ -50,3 +51,7 @@ class DeterministicPolicy(nn.Module):
 
     def forward(self, states):
         return torch.tanh(self.mlp(states))
+
+    def exploit(self, state: npt.ArrayLike) -> npt.ArrayLike:
+        state = torch.FloatTensor(state.reshape(1, -1)).to(self.device)
+        return self.forward(state).cpu().data.numpy().flatten()
