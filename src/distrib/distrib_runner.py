@@ -28,15 +28,15 @@ class Queue:
         return None
 
 
-def env_worker(make_env, make_policy):
+def env_worker(make_env, make_policy, id_worker):
     env = make_env("cartpole-balance", seed=0)
     print("Env created.")
 
     policy = make_policy()
     print("Policy created.")
 
-    q_env = Queue("env_0")
-    q_policy = Queue("policy")
+    q_env = Queue(f"env_{id_worker}")
+    q_policy = Queue(f"policy_{id_worker}")
     print("Queue created.")
 
     episodes = []
@@ -77,15 +77,18 @@ def env_worker(make_env, make_policy):
     print("Episode by env worker is done.")
 
 
-def policy_update_worker(make_algo, make_env_test, make_buffer):
+def policy_update_worker(make_algo, make_env_test, make_buffer, n_workers):
     EPOCHS = 500
     algo = make_algo()
     print("Algo created.")
     buffer = make_buffer()
     print("Buffer created.")
 
-    q_env = Queue("env_0")
-    q_policy = Queue("policy")
+    q_envs = []
+    q_policies = []
+    for i_env in range(n_workers):
+        q_envs.append(Queue(f"env_{i_env}"))
+        q_policies.append(Queue(f"policy_{i_env}"))
     print("Learner queue created.")
 
     batch_size = 128
@@ -95,15 +98,17 @@ def policy_update_worker(make_algo, make_env_test, make_buffer):
 
     for i_epoch in range(EPOCHS):
         print("Epoch ", i_epoch)
-        data = q_env.pop()
-        if data:
-            episode = pickle.loads(data)
-            buffer.add_episode(episode)
-            # print("Episode added to buffer OK.")
-        else:
-            print("Waiting for the env data...")
-            time.sleep(1)
-            continue
+        for i_env in range(n_workers):
+            data = q_envs[i_env].pop()
+            if data:
+                episode = pickle.loads(data)
+                buffer.add_episode(episode)
+                # print("Episode added to buffer OK.")
+            else:
+                print("Waiting for the env data...")
+                # TODO: not optimal wait for each queue
+                time.sleep(1)
+                continue
 
         if i_epoch > 5:
             for i in range(100):
@@ -114,7 +119,10 @@ def policy_update_worker(make_algo, make_env_test, make_buffer):
             # print("Upadate performed OK.")
         
         policy_state_dict = algo.get_policy_state_dict()
-        q_policy.push(pickle.dumps(policy_state_dict))
+
+        policy_serialized = pickle.dumps(policy_state_dict)
+        for i_env in range(n_workers):
+            q_policies[i_env].push(policy_serialized)
         # print("Pushing policy")
     
         if True:
