@@ -67,7 +67,7 @@ class DDPG:
 
         self.critic = Critic(state_shape, action_shape).to(device)
         self.critic_target = deepcopy(self.critic)
-        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), weight_decay=1e-2, lr=3e-4)
+        self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=3e-4)
 
         self.logger = logger
 
