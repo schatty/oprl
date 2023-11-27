@@ -10,9 +10,11 @@ PyTorch implementation of Distributed Distributional Deterministic Policy Gradie
 The project is under an active renovation, for the old code with `D4PG` algorithm working with multiprocessing queues and `mujoco_py` please refer to the branch `d4pg_legacy`.
 
 ### Roadmap 🏗
-- [x] Switching to `mujoco 2.3.7` 
+- [x] Switching to `mujoco 2.3.7`
+- [x] Replacing multiprocessing queues with RabbitMQ for distributed RL
 - [ ] Baselines with DDPG for `dm_control` for 1M step
 - [ ] Baselines with Distributed DDPG for `dm_control`
+- [ ] TD3 with Distributional TD3
 - [ ] Bringing back D4PG logic
 - [ ] Tests
 - [ ] New Algos
