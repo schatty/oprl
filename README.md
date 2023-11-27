@@ -7,9 +7,9 @@ PyTorch implementation of Distributed Distributional Deterministic Policy Gradie
 
 
 # About
-The project is under an active renovation 🏗, for the old code working with multiprocessing queues and `mujoco_py` please refer to the branch `d4pg_legacy`.
+The project is under an active renovation, for the old code with `D4PG` algorithm working with multiprocessing queues and `mujoco_py` please refer to the branch `d4pg_legacy`.
 
-### Roadmap
+### Roadmap 🏗
 - [x] Switching to `mujoco 2.3.7` 
 - [ ] Baselines with DDPG for `dm_control` for 1M step
 - [ ] Baselines with Distributed DDPG for `dm_control`
@@ -21,7 +21,7 @@ The project is under an active renovation 🏗, for the old code working with mu
 
 To run DDPG in a single process
 ```
-python src/train.py --config src/configs/ddpg_walker.py --env walker-walk --n_seeds_processes 1
+python src/oprl/configs/ddpg.py --env walker-walk
 ```
 
 To run distributed DDPG
@@ -31,7 +31,7 @@ python src/oprl/configs/d3pg.py --env walker-walk
 
 ## Results
 
-Preliminary results of D3PG for `walker` domain
+Preliminary results of D3PG for `walker` domain with 4 workers
 <p align="center">
 <img width="1000" alt="prelim_results_d3pg" src="https://github.com/schatty/d4pg-pytorch/assets/23639048/fe3057c7-4792-41fe-98f6-abc8e5ccb710">
 </p>
