@@ -6,13 +6,12 @@ from multiprocessing import Process
 from copy import copy, deepcopy
 
 from oprl.trainers.base_trainer import run_training
-from oprl.algos.ddpg import DDPG
+from oprl.algos.tqc import TQC
 from oprl.utils.logger import Logger
 from oprl.env import DMControlEnv
 from oprl.configs.utils import parse_args, create_logdir
 
 logging.basicConfig(level=logging.INFO)
-
 
 args = parse_args()
 
@@ -31,12 +30,12 @@ ACTION_SHAPE = env.action_space.shape
 config = {
     "state_shape": STATE_SHAPE,
     "action_shape": ACTION_SHAPE,
-    "num_steps": int(1_000_000),
+    "num_steps": int(15_000),
     "eval_every": 2500,
     "device": args.device,
     "save_buffer": False,
     "visualise_every": 0,
-    "estimate_q_every": 5000,
+    "estimate_q_every": 0,  # TODO: Here is the unsupported logic
     "log_every": 2500
 }
 
@@ -44,7 +43,7 @@ config = {
  
 
 def make_algo(logger, seed):
-    return DDPG(
+    return TQC(
         state_shape=STATE_SHAPE,
         action_shape=ACTION_SHAPE,
         device=args.device,
@@ -54,7 +53,7 @@ def make_algo(logger, seed):
 
 
 def make_logger(seed: int):
-    log_dir = create_logdir(logdir="logs", algo="DDPG", env=args.env, seed=seed)
+    log_dir = create_logdir(logdir="logs", algo="TQC", env=args.env, seed=seed)
     #TODO: add config here instead {}
     return Logger(log_dir, {})
 
@@ -79,3 +78,4 @@ if __name__ == "__main__":
             p.join()
 
     print("OK.")
+

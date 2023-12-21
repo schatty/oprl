@@ -183,6 +183,9 @@ class BaseTrainer:
             action = torch.tensor(action).unsqueeze(0).float().to(self.device)
  
             q = self.algo.critic(state, action)
+            # TODO: TQC is not supported by this logic, need to update
+            if isinstance(q, tuple):
+                q = q[0]
             q = q.item()
             qs.append(q)
 

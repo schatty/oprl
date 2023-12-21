@@ -6,13 +6,12 @@ from multiprocessing import Process
 from copy import copy, deepcopy
 
 from oprl.trainers.base_trainer import run_training
-from oprl.algos.ddpg import DDPG
+from oprl.algos.td3 import TD3
 from oprl.utils.logger import Logger
 from oprl.env import DMControlEnv
 from oprl.configs.utils import parse_args, create_logdir
 
 logging.basicConfig(level=logging.INFO)
-
 
 args = parse_args()
 
@@ -31,7 +30,7 @@ ACTION_SHAPE = env.action_space.shape
 config = {
     "state_shape": STATE_SHAPE,
     "action_shape": ACTION_SHAPE,
-    "num_steps": int(1_000_000),
+    "num_steps": int(15_000),
     "eval_every": 2500,
     "device": args.device,
     "save_buffer": False,
@@ -44,7 +43,7 @@ config = {
  
 
 def make_algo(logger, seed):
-    return DDPG(
+    return TD3(
         state_shape=STATE_SHAPE,
         action_shape=ACTION_SHAPE,
         device=args.device,
@@ -54,7 +53,7 @@ def make_algo(logger, seed):
 
 
 def make_logger(seed: int):
-    log_dir = create_logdir(logdir="logs", algo="DDPG", env=args.env, seed=seed)
+    log_dir = create_logdir(logdir="logs", algo="TD3", env=args.env, seed=seed)
     #TODO: add config here instead {}
     return Logger(log_dir, {})
 

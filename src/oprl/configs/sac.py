@@ -6,21 +6,12 @@ from multiprocessing import Process
 from copy import copy, deepcopy
 
 from oprl.trainers.base_trainer import run_training
-from oprl.algos.distrib_ddpg import DistribDDPG
+from oprl.algos.sac import SAC
 from oprl.utils.logger import Logger
 from oprl.env import DMControlEnv
-from oprl.configs.utils import create_logdir
+from oprl.configs.utils import parse_args, create_logdir
 
 logging.basicConfig(level=logging.INFO)
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description='Run training')
-    parser.add_argument("--config", type=str, help="Path to the config file.")
-    parser.add_argument("--env", type=str, default="cartpole-balance", help="Name of the environment.")
-    parser.add_argument("--n_seed_processes", type=int, default=1, help="Number of parallel processes launched with different random seeds.")
-    parser.add_argument("--device", type=str, default="cpu", help="Device to perform training on.")
-    return parser.parse_args()
 
 args = parse_args()
 
@@ -52,7 +43,7 @@ config = {
  
 
 def make_algo(logger, seed):
-    return DistribDDPG(
+    return SAC(
         state_shape=STATE_SHAPE,
         action_shape=ACTION_SHAPE,
         device=args.device,
@@ -62,7 +53,7 @@ def make_algo(logger, seed):
 
 
 def make_logger(seed: int):
-    log_dir = create_logdir(logdir="logs", algo="DistribDDPG", env=args.env, seed=seed)
+    log_dir = create_logdir(logdir="logs", algo="SAC", env=args.env, seed=seed)
     #TODO: add config here instead {}
     return Logger(log_dir, {})
 
@@ -70,13 +61,13 @@ def make_logger(seed: int):
 if __name__ == "__main__":
     args = parse_args()
 
-    if args.n_seed_processes == 1:
+    if args.seeds == 1:
         run_training(make_algo, make_env, make_logger, config, 0)
     else:
         processes = []
-        for seed in range(args.n_seed_processes):
+        for seed in range(args.start_seed, args.start_seed + args.seeds):
             processes.append(
-                    Process(target=run_training, args=(make_trainer, seed))
+                    Process(target=run_training, args=(make_algo, make_env, make_logger, config, seed))
             )
 
         for i, p in enumerate(processes):
@@ -86,4 +77,5 @@ if __name__ == "__main__":
         for p in processes:
             p.join()
 
-    print("Training end.")
+    print("OK.")
+
