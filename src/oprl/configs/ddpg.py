@@ -18,7 +18,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Run training')
     parser.add_argument("--config", type=str, help="Path to the config file.")
     parser.add_argument("--env", type=str, default="cartpole-balance", help="Name of the environment.")
-    parser.add_argument("--n_seed_processes", type=int, default=1, help="Number of parallel processes launched with different random seeds.")
+    parser.add_argument("--seeds", type=int, default=1, help="Number of parallel processes launched with different random seeds.")
+    parser.add_argument("--start_seed", type=int, default=0, help="Number of the first seed. Following seeds will be incremented from it.")
     parser.add_argument("--device", type=str, default="cpu", help="Device to perform training on.")
     return parser.parse_args()
 
@@ -39,7 +40,7 @@ ACTION_SHAPE = env.action_space.shape
 config = {
     "state_shape": STATE_SHAPE,
     "action_shape": ACTION_SHAPE,
-    "num_steps": int(15_000),
+    "num_steps": int(1_000_000),
     "eval_every": 2500,
     "device": args.device,
     "save_buffer": False,
@@ -70,13 +71,13 @@ def make_logger(seed: int):
 if __name__ == "__main__":
     args = parse_args()
 
-    if args.n_seed_processes == 1:
+    if args.seeds == 1:
         run_training(make_algo, make_env, make_logger, config, 0)
     else:
         processes = []
-        for seed in range(args.n_seed_processes):
+        for seed in range(args.start_seed, args.start_seed + args.seeds):
             processes.append(
-                    Process(target=run_training, args=(make_trainer, seed))
+                    Process(target=run_training, args=(make_algo, make_env, make_logger, config, seed))
             )
 
         for i, p in enumerate(processes):
@@ -86,4 +87,4 @@ if __name__ == "__main__":
         for p in processes:
             p.join()
 
-    print("Training end.")
+    print("OK.")

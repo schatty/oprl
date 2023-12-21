@@ -210,7 +210,7 @@ def run_training(make_algo, make_env, make_logger, config, seed):
         seed=seed,
         logger=logger,
     )
-    print("Trianer created.")
+    print("Trainer created.")
 
     trainer.train()
     print("Training end.")
