@@ -19,6 +19,13 @@ The project is under an active renovation, for the old code with `D4PG` algorith
 - [ ] Tests
 - [ ] New Algos
 
+# Installation
+
+```
+pip install -r requirements.txt
+cd src && pip install -e .
+```
+
 # Usage
 
 To run DDPG in a single process
