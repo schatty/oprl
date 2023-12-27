@@ -40,7 +40,7 @@ python src/oprl/configs/d3pg.py --env walker-walk
 ## Results
 
 Results for single process DDPG and TQC:
-![ddpg_tqc_eval](https://github.com/schatty/d4pg-pytorch/assets/23639048/9d56ac05-88fe-4273-89a1-1f2aa0d2914c)
+![ddpg_tqc_eval](https://github.com/schatty/d4pg-pytorch/assets/23639048/f2c32f62-63b4-4a66-a636-4ce0ea1522f6)
 
 ## References
 * Continuous control with deep reinforcement learning, [https://arxiv.org/abs/1509.02971]
