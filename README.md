@@ -12,10 +12,9 @@ The project is under an active renovation, for the old code with `D4PG` algorith
 ### Roadmap 🏗
 - [x] Switching to `mujoco 3.1.1`
 - [x] Replacing multiprocessing queues with RabbitMQ for distributed RL
-- [ ] Baselines with DDPG for `dm_control` for 1M step
+- [x] Baselines with DDPG, TQC for `dm_control` for 1M step
 - [ ] Baselines with Distributed DDPG for `dm_control`
-- [ ] TD3 with Distributional TD3
-- [ ] Bringing back D4PG logic
+- [ ] Bringing back D4PG logic on top of TQC
 - [ ] Tests
 - [ ] New Algos
 
@@ -40,10 +39,8 @@ python src/oprl/configs/d3pg.py --env walker-walk
 
 ## Results
 
-Preliminary results of D3PG for `walker` domain with 4 workers
-<p align="center">
-<img width="1000" alt="prelim_results_d3pg" src="https://github.com/schatty/d4pg-pytorch/assets/23639048/fe3057c7-4792-41fe-98f6-abc8e5ccb710">
-</p>
+Results for single process DDPG and TQC:
+![ddpg_tqc_eval](https://github.com/schatty/d4pg-pytorch/assets/23639048/9d56ac05-88fe-4273-89a1-1f2aa0d2914c)
 
 ## References
 * Continuous control with deep reinforcement learning, [https://arxiv.org/abs/1509.02971]
