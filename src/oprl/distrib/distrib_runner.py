@@ -12,9 +12,7 @@ class Queue:
     def __init__(self, name: str, host: str = "localhost"):
         self._name = name
 
-        connection = pika.BlockingConnection(
-                pika.ConnectionParameters(host=host)
-        )
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host=host))
         self.channel = connection.channel()
         self.channel.queue_declare(queue=name)
 
@@ -41,7 +39,7 @@ def env_worker(make_env, make_policy, n_episodes, id_worker):
     print("Queue created.")
 
     episodes = []
-    
+
     total_env_step = 0
     start_steps = 1000
     for i_ep in range(n_episodes):
@@ -66,14 +64,14 @@ def env_worker(make_env, make_policy, n_episodes, id_worker):
 
         q_env.push(pickle.dumps(episode))
         # print(f"Episode {i_ep} sent!")
-        
+
         while True:
             data = q_policy.pop()
             if data is None:
                 print("Waiting for the policy..")
                 time.sleep(2.0)
                 continue
-        
+
             policy.load_state_dict(pickle.loads(data))
             # print("New policy in agent loaded")
             break
@@ -127,14 +125,14 @@ def policy_update_worker(make_algo, make_env_test, make_buffer, n_workers):
                 if i % int(1000) == 0:
                     print(f"\tUpdating {i}")
             # print("Upadate performed OK.")
-        
+
         policy_state_dict = algo.get_policy_state_dict()
 
         policy_serialized = pickle.dumps(policy_state_dict)
         for i_env in range(n_workers):
             q_policies[i_env].push(policy_serialized)
         # print("Pushing policy")
-    
+
         if True:
             mean_reward = evaluate(algo, make_env_test)
             algo.logger.log_scalar("trainer/ep_reward", mean_reward, i_epoch)
@@ -160,4 +158,3 @@ def evaluate(algo, make_env_test, num_eval_episodes: int = 5, seed: int = 0):
 
     mean_return = np.mean(returns)
     return mean_return
-

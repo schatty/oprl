@@ -6,8 +6,16 @@ import torch
 
 
 class EpisodicReplayBuffer:
-
-    def __init__(self, buffer_size, state_shape, action_shape, device, gamma, max_episode_len=1000, dtype=torch.float):
+    def __init__(
+        self,
+        buffer_size,
+        state_shape,
+        action_shape,
+        device,
+        gamma,
+        max_episode_len=1000,
+        dtype=torch.float,
+    ):
         """
         Args:
             buffer_size: Max number of transitions in buffer.
@@ -30,13 +38,27 @@ class EpisodicReplayBuffer:
         self.cur_episodes = 1
         self.cur_size = 0
 
-        self.actions = torch.empty((self.max_episodes, max_episode_len, *action_shape), dtype=dtype, device=device)
-        self.rewards = torch.empty((self.max_episodes, max_episode_len, 1), dtype=dtype, device=device)
-        self.dones = torch.empty((self.max_episodes, max_episode_len, 1), dtype=dtype, device=device)
-        self.states = torch.empty((self.max_episodes, max_episode_len + 1, *state_shape), dtype=dtype, device=device)
+        self.actions = torch.empty(
+            (self.max_episodes, max_episode_len, *action_shape),
+            dtype=dtype,
+            device=device,
+        )
+        self.rewards = torch.empty(
+            (self.max_episodes, max_episode_len, 1), dtype=dtype, device=device
+        )
+        self.dones = torch.empty(
+            (self.max_episodes, max_episode_len, 1), dtype=dtype, device=device
+        )
+        self.states = torch.empty(
+            (self.max_episodes, max_episode_len + 1, *state_shape),
+            dtype=dtype,
+            device=device,
+        )
         self.ep_lens = [0] * self.max_episodes
 
-        self.actions_for_std = torch.empty((100, *action_shape), dtype=dtype, device=device)
+        self.actions_for_std = torch.empty(
+            (100, *action_shape), dtype=dtype, device=device
+        )
         self.actions_for_std_cnt = 0
 
     # TODO: rename to add
@@ -49,12 +71,18 @@ class EpisodicReplayBuffer:
             done: done only if episode ends naturally.
             episode_done: done that can be set to True if time limit is reached.
         """
-        self.states[self.ep_pointer, self.ep_lens[self.ep_pointer]].copy_(torch.from_numpy(state))
-        self.actions[self.ep_pointer, self.ep_lens[self.ep_pointer]].copy_(torch.from_numpy(action))
+        self.states[self.ep_pointer, self.ep_lens[self.ep_pointer]].copy_(
+            torch.from_numpy(state)
+        )
+        self.actions[self.ep_pointer, self.ep_lens[self.ep_pointer]].copy_(
+            torch.from_numpy(action)
+        )
         self.rewards[self.ep_pointer, self.ep_lens[self.ep_pointer]] = float(reward)
         self.dones[self.ep_pointer, self.ep_lens[self.ep_pointer]] = float(done)
 
-        self.actions_for_std[self.actions_for_std_cnt % 100].copy_(torch.from_numpy(action))
+        self.actions_for_std[self.actions_for_std_cnt % 100].copy_(
+            torch.from_numpy(action)
+        )
         self.actions_for_std_cnt += 1
 
         self.ep_lens[self.ep_pointer] += 1
@@ -63,10 +91,10 @@ class EpisodicReplayBuffer:
             self._inc_episode()
 
     def _inc_episode(self):
-            self.ep_pointer = (self.ep_pointer + 1) % self.max_episodes
-            self.cur_episodes = min(self.cur_episodes + 1, self.max_episodes)
-            self.cur_size -= self.ep_lens[self.ep_pointer]
-            self.ep_lens[self.ep_pointer] = 0
+        self.ep_pointer = (self.ep_pointer + 1) % self.max_episodes
+        self.cur_episodes = min(self.cur_episodes + 1, self.max_episodes)
+        self.cur_size -= self.ep_lens[self.ep_pointer]
+        self.ep_lens[self.ep_pointer] = 0
 
     def add_episode(self, episode):
         for (s, a, r, d, s_) in episode:
@@ -77,9 +105,11 @@ class EpisodicReplayBuffer:
             self._inc_episode()
 
     def _inds_to_episodic(self, inds):
-        start_inds = np.cumsum([0] + self.ep_lens[:self.cur_episodes - 1])        
-        end_inds = start_inds + np.array(self.ep_lens[:self.cur_episodes])
-        ep_inds = np.argmin(inds.reshape(-1, 1) >= np.tile(end_inds, (len(inds), 1)), axis=1)
+        start_inds = np.cumsum([0] + self.ep_lens[: self.cur_episodes - 1])
+        end_inds = start_inds + np.array(self.ep_lens[: self.cur_episodes])
+        ep_inds = np.argmin(
+            inds.reshape(-1, 1) >= np.tile(end_inds, (len(inds), 1)), axis=1
+        )
         step_inds = inds - start_inds[ep_inds]
 
         return ep_inds, step_inds
@@ -93,7 +123,7 @@ class EpisodicReplayBuffer:
             self.actions[ep_inds, step_inds],
             self.rewards[ep_inds, step_inds],
             self.dones[ep_inds, step_inds],
-            self.states[ep_inds, step_inds + 1]
+            self.states[ep_inds, step_inds + 1],
         )
 
     def save(self, path: str):
@@ -106,11 +136,11 @@ class EpisodicReplayBuffer:
             os.makedirs(dirname)
 
         data = {
-            "states": self.states.cpu(), 
+            "states": self.states.cpu(),
             "actions": self.actions.cpu(),
             "rewards": self.rewards.cpu(),
             "dones": self.dones.cpu(),
-            "ep_lens": self.ep_lens
+            "ep_lens": self.ep_lens,
         }
         try:
             with open(path, "wb") as f:

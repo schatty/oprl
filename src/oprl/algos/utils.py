@@ -3,12 +3,11 @@ import torch.nn as nn
 
 
 class Clamp(nn.Module):
-
     def forward(self, log_stds):
         return log_stds.clamp_(-20, 2)
 
 
-def initialize_weight(m, gain=nn.init.calculate_gain('relu')):
+def initialize_weight(m, gain=nn.init.calculate_gain("relu")):
     # Initialize linear layers with the orthogonal initialization.
     if isinstance(m, nn.Linear):
         nn.init.orthogonal_(m.weight.data, gain)
@@ -24,7 +23,7 @@ def initialize_weight(m, gain=nn.init.calculate_gain('relu')):
 
 
 def soft_update(target, source, tau):
-    """ Update target network using Polyak-Ruppert Averaging. """
+    """Update target network using Polyak-Ruppert Averaging."""
     with torch.no_grad():
         for tgt, src in zip(target.parameters(), source.parameters()):
             tgt.data.mul_(1.0 - tau)
@@ -32,6 +31,6 @@ def soft_update(target, source, tau):
 
 
 def disable_gradient(network):
-    """ Disable gradient calculations of the network. """
+    """Disable gradient calculations of the network."""
     for param in network.parameters():
         param.requires_grad = False

@@ -5,16 +5,20 @@ from oprl.algos.utils import initialize_weight
 
 
 class Critic(nn.Module):
-
-    def __init__(self, state_shape, action_shape, hidden_units=(256, 256),
-                 hidden_activation=nn.ReLU(inplace=True)):
+    def __init__(
+        self,
+        state_shape,
+        action_shape,
+        hidden_units=(256, 256),
+        hidden_activation=nn.ReLU(inplace=True),
+    ):
         super().__init__()
 
         self.q1 = MLP(
             input_dim=state_shape[0] + action_shape[0],
             output_dim=1,
             hidden_units=hidden_units,
-            hidden_activation=hidden_activation
+            hidden_activation=hidden_activation,
         )
 
     def forward(self, states, actions):
@@ -27,23 +31,27 @@ class Critic(nn.Module):
 
 
 class DoubleCritic(nn.Module):
-
-    def __init__(self, state_shape, action_shape, hidden_units=(256, 256),
-                 hidden_activation=nn.ReLU(inplace=True)):
+    def __init__(
+        self,
+        state_shape,
+        action_shape,
+        hidden_units=(256, 256),
+        hidden_activation=nn.ReLU(inplace=True),
+    ):
         super().__init__()
 
         self.q1 = MLP(
             input_dim=state_shape[0] + action_shape[0],
             output_dim=1,
             hidden_units=hidden_units,
-            hidden_activation=hidden_activation
+            hidden_activation=hidden_activation,
         )
 
         self.q2 = MLP(
             input_dim=state_shape[0] + action_shape[0],
             output_dim=1,
             hidden_units=hidden_units,
-            hidden_activation=hidden_activation
+            hidden_activation=hidden_activation,
         )
 
     def forward(self, states, actions):
@@ -56,30 +64,34 @@ class DoubleCritic(nn.Module):
 
 
 class MCCritic(nn.Module):
-
-    def __init__(self, state_shape, action_shape, hidden_units=(256, 256),
-                 hidden_activation=nn.ReLU(inplace=True)):
+    def __init__(
+        self,
+        state_shape,
+        action_shape,
+        hidden_units=(256, 256),
+        hidden_activation=nn.ReLU(inplace=True),
+    ):
         super().__init__()
 
         self.q1 = MLP(
             input_dim=state_shape[0] + action_shape[0],
             output_dim=1,
             hidden_units=hidden_units,
-            hidden_activation=hidden_activation
+            hidden_activation=hidden_activation,
         )
 
         self.q2 = MLP(
             input_dim=state_shape[0] + action_shape[0],
             output_dim=1,
             hidden_units=hidden_units,
-            hidden_activation=hidden_activation
+            hidden_activation=hidden_activation,
         )
 
         self.q3 = MLP(
             input_dim=state_shape[0] + action_shape[0],
             output_dim=1,
             hidden_units=hidden_units,
-            hidden_activation=hidden_activation
+            hidden_activation=hidden_activation,
         )
 
     def forward(self, states, actions):
@@ -90,7 +102,7 @@ class MCCritic(nn.Module):
         x = torch.cat([states, actions], dim=-1)
         return self.q1(x)
 
-    def get_action_grad(self, optim, states, actions): #, actions):
+    def get_action_grad(self, optim, states, actions):  # , actions):
         q1, q2, q3 = self.forward(states, actions)
         q_cat = torch.cat((q1, q2, q3), dim=1).flatten()
         var = torch.var(q_cat)
@@ -103,9 +115,14 @@ class MCCritic(nn.Module):
 
 
 class MLP(nn.Module):
-    
-    def __init__(self, input_dim, output_dim, hidden_units=(64, 64),
-                 hidden_activation=nn.Tanh(), output_activation=nn.Identity()):
+    def __init__(
+        self,
+        input_dim,
+        output_dim,
+        hidden_units=(64, 64),
+        hidden_activation=nn.Tanh(),
+        output_activation=nn.Identity(),
+    ):
         super().__init__()
 
         layers = []
@@ -127,4 +144,4 @@ class MLP(nn.Module):
         for p in self.nn.parameters():
             param_norm = p.grad.detach().data.norm(2)
             total_norm += param_norm.item() ** 2
-        return total_norm ** 0.5
+        return total_norm**0.5

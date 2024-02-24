@@ -2,19 +2,22 @@ from copy import deepcopy
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torch import nn
 from torch.optim import Adam
-import torch.nn.functional as F
 
-
-from oprl.algos.nn import DoubleCritic, MLP
-from oprl.algos.utils import initialize_weight, soft_update, disable_gradient
+from oprl.algos.nn import MLP, DoubleCritic
+from oprl.algos.utils import disable_gradient, initialize_weight, soft_update
 
 
 class DeterministicPolicy(nn.Module):
-
-    def __init__(self, state_shape, action_shape, hidden_units=(256, 256),
-                 hidden_activation=nn.ReLU(inplace=True)):
+    def __init__(
+        self,
+        state_shape,
+        action_shape,
+        hidden_units=(256, 256),
+        hidden_activation=nn.ReLU(inplace=True),
+    ):
         super().__init__()
 
         self.mlp = MLP(
@@ -29,10 +32,25 @@ class DeterministicPolicy(nn.Module):
 
 
 class TD3:
-
-    def __init__(self, state_shape, action_shape, device, seed, batch_size=256, policy_noise=0.2,
-                 expl_noise=0.1, noise_clip=0.5, policy_freq=2, gamma=0.99, lr_actor=3e-4, lr_critic=3e-4,
-                 max_action=1.0, target_update_coef=5e-3, log_every=5000, logger=None):
+    def __init__(
+        self,
+        state_shape,
+        action_shape,
+        device="cpu",
+        seed=0,
+        batch_size=256,
+        policy_noise=0.2,
+        expl_noise=0.1,
+        noise_clip=0.5,
+        policy_freq=2,
+        gamma=0.99,
+        lr_actor=3e-4,
+        lr_critic=3e-4,
+        max_action=1.0,
+        target_update_coef=5e-3,
+        log_every=5000,
+        logger=None,
+    ):
         np.random.seed(seed)
         torch.manual_seed(seed)
 
@@ -57,7 +75,7 @@ class TD3:
             state_shape=self.state_shape,
             action_shape=self.action_shape,
             hidden_units=[256, 256],
-            hidden_activation=nn.ReLU(inplace=True)
+            hidden_activation=nn.ReLU(inplace=True),
         ).to(self.device)
 
         self.actor_target = deepcopy(self.actor).to(self.device).eval()
@@ -66,7 +84,7 @@ class TD3:
             state_shape=self.state_shape,
             action_shape=self.action_shape,
             hidden_units=[256, 256],
-            hidden_activation=nn.ReLU(inplace=True)
+            hidden_activation=nn.ReLU(inplace=True),
         ).to(self.device)
 
         self.critic_target = deepcopy(self.critic).to(self.device).eval()
@@ -78,11 +96,12 @@ class TD3:
         self.target_update_coef = target_update_coef
 
     def explore(self, state):
-        state = torch.tensor(
-            state, dtype=self.dtype, device=self.device).unsqueeze_(0)
+        state = torch.tensor(state, dtype=self.dtype, device=self.device).unsqueeze_(0)
 
         with torch.no_grad():
-            noise = (torch.randn(self.action_shape) * self.max_action * self.expl_noise).to(self.device)
+            noise = (
+                torch.randn(self.action_shape) * self.max_action * self.expl_noise
+            ).to(self.device)
             action = self.actor(state) + noise
 
         a = action.cpu().numpy()[0]
@@ -104,9 +123,9 @@ class TD3:
 
         with torch.no_grad():
             # Select action according to policy and add clipped noise
-            noise = (
-                    torch.randn_like(actions) * self.policy_noise
-            ).clamp(-self.noise_clip, self.noise_clip)
+            noise = (torch.randn_like(actions) * self.policy_noise).clamp(
+                -self.noise_clip, self.noise_clip
+            )
 
             next_actions = self.actor_target(next_states) + noise
             next_actions = next_actions.clamp(-self.max_action, self.max_action)
@@ -125,13 +144,29 @@ class TD3:
         self.optim_critic.step()
 
         if self.update_step % self.log_every == 0:
-            self.logger.log_scalar("algo/q1", q1.detach().mean().cpu(), self.update_step)
-            self.logger.log_scalar("algo/q_target", q_target.mean().cpu(), self.update_step)
-            self.logger.log_scalar("algo/abs_q_err", (q1 - q_target).detach().mean().cpu(), self.update_step)
-            self.logger.log_scalar("algo/critic_loss", loss_critic.item(), self.update_step)
-            self.logger.log_scalar("algo/q1_grad_norm", self.critic.q1.get_layer_norm(), self.update_step)
-            self.logger.log_scalar("algo/actor_grad_norm", self.actor.mlp.get_layer_norm(), self.update_step)
-            
+            self.logger.log_scalar(
+                "algo/q1", q1.detach().mean().cpu(), self.update_step
+            )
+            self.logger.log_scalar(
+                "algo/q_target", q_target.mean().cpu(), self.update_step
+            )
+            self.logger.log_scalar(
+                "algo/abs_q_err",
+                (q1 - q_target).detach().mean().cpu(),
+                self.update_step,
+            )
+            self.logger.log_scalar(
+                "algo/critic_loss", loss_critic.item(), self.update_step
+            )
+            self.logger.log_scalar(
+                "algo/q1_grad_norm", self.critic.q1.get_layer_norm(), self.update_step
+            )
+            self.logger.log_scalar(
+                "algo/actor_grad_norm",
+                self.actor.mlp.get_layer_norm(),
+                self.update_step,
+            )
+
     def update_actor(self, states):
         actions = self.actor(states)
         qs1 = self.critic.Q1(states, actions)
@@ -142,11 +177,12 @@ class TD3:
         self.optim_actor.step()
 
         if self.update_step % self.log_every == 0:
-            self.logger.log_scalar("algo/loss_actor", loss_actor.item(), self.update_step)
+            self.logger.log_scalar(
+                "algo/loss_actor", loss_actor.item(), self.update_step
+            )
 
     def exploit(self, state):
-        state = torch.tensor(
-            state, dtype=self.dtype, device=self.device).unsqueeze_(0)
+        state = torch.tensor(state, dtype=self.dtype, device=self.device).unsqueeze_(0)
         with torch.no_grad():
             action = self.actor(state)
         return action.cpu().numpy()[0]

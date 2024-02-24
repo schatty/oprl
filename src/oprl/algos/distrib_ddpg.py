@@ -18,7 +18,9 @@ from oprl.algos.utils import initialize_weight
 
 ## Code of projection was taken from:
 # https://github.com/PacktPublishing/Deep-Reinforcement-Learning-Hands-On/blob/master/Chapter14/06_train_d4pg.py
-def _l2_project(next_distr_v, rewards_v, dones_mask_t, gamma, delta_z, n_atoms, v_min, v_max):
+def _l2_project(
+    next_distr_v, rewards_v, dones_mask_t, gamma, delta_z, n_atoms, v_min, v_max
+):
     print("next_distr_v", next_distr_v.shape)
     print("rewards_v", rewards_v.shape)
     print("dones_mask_t", dones_mask_t.shape)
@@ -32,7 +34,9 @@ def _l2_project(next_distr_v, rewards_v, dones_mask_t, gamma, delta_z, n_atoms, 
     proj_distr = np.zeros((batch_size, n_atoms), dtype=np.float32)
 
     for atom in range(n_atoms):
-        tz_j = np.minimum(v_max, np.maximum(v_min, rewards + (v_min + atom * delta_z) * gamma))
+        tz_j = np.minimum(
+            v_max, np.maximum(v_min, rewards + (v_min + atom * delta_z) * gamma)
+        )
         b_j = (tz_j - v_min) / delta_z
         l = np.floor(b_j).astype(np.int64)
         u = np.ceil(b_j).astype(np.int64)
@@ -45,8 +49,12 @@ def _l2_project(next_distr_v, rewards_v, dones_mask_t, gamma, delta_z, n_atoms, 
         print("atom", atom)
         proj_distr[eq_mask, l[eq_mask]] += next_distr[eq_mask, atom]
         ne_mask = u != l
-        proj_distr[ne_mask, l[ne_mask]] += next_distr[ne_mask, atom] * (u - b_j)[ne_mask]
-        proj_distr[ne_mask, u[ne_mask]] += next_distr[ne_mask, atom] * (b_j - l)[ne_mask]
+        proj_distr[ne_mask, l[ne_mask]] += (
+            next_distr[ne_mask, atom] * (u - b_j)[ne_mask]
+        )
+        proj_distr[ne_mask, u[ne_mask]] += (
+            next_distr[ne_mask, atom] * (b_j - l)[ne_mask]
+        )
 
     if dones_mask.any():
         proj_distr[dones_mask] = 0.0
@@ -70,10 +78,18 @@ def _l2_project(next_distr_v, rewards_v, dones_mask_t, gamma, delta_z, n_atoms, 
 
 
 class ValueNetwork(nn.Module):
-    """Critic - return Q value from given states and actions. """
+    """Critic - return Q value from given states and actions."""
 
-    def __init__(self, state_shape, action_shape, hidden_size, v_min, v_max,
-                 num_atoms, device='cuda'):
+    def __init__(
+        self,
+        state_shape,
+        action_shape,
+        hidden_size,
+        v_min,
+        v_max,
+        num_atoms,
+        device="cuda",
+    ):
         super().__init__()
 
         self.linear1 = nn.Linear(state_shape[0] + action_shape[0], hidden_size)
@@ -94,9 +110,14 @@ class ValueNetwork(nn.Module):
 
 
 class DeterministicPolicy(nn.Module):
-
-    def __init__(self, state_shape, action_shape, hidden_units=(256, 256),
-                 hidden_activation=nn.ReLU(inplace=True), device: str="cpu"):
+    def __init__(
+        self,
+        state_shape,
+        action_shape,
+        hidden_units=(256, 256),
+        hidden_activation=nn.ReLU(inplace=True),
+        device: str = "cpu",
+    ):
         super().__init__()
 
         self.mlp = MLP(
@@ -117,8 +138,9 @@ class DeterministicPolicy(nn.Module):
         return self.forward(state).cpu().data.numpy().flatten()
 
     def explore(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        state = torch.tensor(
-            state, dtype=torch.float, device=self._device).unsqueeze_(0)
+        state = torch.tensor(state, dtype=torch.float, device=self._device).unsqueeze_(
+            0
+        )
 
         # TODO: Set exploration noise of 0.1 as the property of the agent
         with torch.no_grad():
@@ -131,15 +153,24 @@ class DeterministicPolicy(nn.Module):
 
 
 class DistribDDPG:
-    def __init__(self, state_shape, action_shape, max_action=1, discount=0.99, tau=5e-3,
-                 batch_size=256, device="cpu", seed=0, logger=None):
+    def __init__(
+        self,
+        state_shape,
+        action_shape,
+        max_action=1,
+        discount=0.99,
+        tau=5e-3,
+        batch_size=256,
+        device="cpu",
+        seed=0,
+        logger=None,
+    ):
         np.random.seed(seed)
         torch.manual_seed(seed)
 
-
         self.logger = logger
 
-        #TODO: add n-step return
+        # TODO: add n-step return
         self.expl_noise = 0.1
         self.num_atoms = 51
         self.v_min = 0
@@ -158,17 +189,19 @@ class DistribDDPG:
             state_shape=state_shape,
             action_shape=action_shape,
             hidden_units=[256, 256],
-            hidden_activation=nn.ReLU(inplace=True)
+            hidden_activation=nn.ReLU(inplace=True),
         ).to(device)
         self.actor_target = deepcopy(self.actor)
         self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=3e-4)
 
-        self.critic = ValueNetwork(state_shape, action_shape, 256, self.v_min, self.v_max, self.num_atoms).to(self.device)
+        self.critic = ValueNetwork(
+            state_shape, action_shape, 256, self.v_min, self.v_max, self.num_atoms
+        ).to(self.device)
         # self.critic = Critic(state_shape, action_shape).to(device)
         self.critic_target = deepcopy(self.critic)
         self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr=3e-4)
         # TODO: maybe simplify setting of the separate loss
-        self.critic_losss = nn.BCELoss(reduction='none')
+        self.critic_losss = nn.BCELoss(reduction="none")
 
     def exploit(self, state):
         state = torch.FloatTensor(state.reshape(1, -1)).to(self.device)
@@ -176,35 +209,42 @@ class DistribDDPG:
 
     # TODO: remove explore from algo to agent completely
     def explore(self, state):
-        state = torch.tensor(
-            state, dtype=self.dtype, device=self.device).unsqueeze_(0)
+        state = torch.tensor(state, dtype=self.dtype, device=self.device).unsqueeze_(0)
 
         with torch.no_grad():
-            noise = (torch.randn(self.action_shape) * self.max_action * self.expl_noise).to(self.device)
+            noise = (
+                torch.randn(self.action_shape) * self.max_action * self.expl_noise
+            ).to(self.device)
             action = self.actor(state) + noise
 
         a = action.cpu().numpy()[0]
         return np.clip(a, -self.max_action, self.max_action)
 
     def update(self, batch):
-        # Sample replay buffer 
-        #state, action, next_state, reward, done = batch
+        # Sample replay buffer
+        # state, action, next_state, reward, done = batch
         state, action, reward, done, next_state = batch
 
         # Compute the target Q value
-        target_val = self.critic_target.get_probs(next_state, self.actor_target(next_state))
+        target_val = self.critic_target.get_probs(
+            next_state, self.actor_target(next_state)
+        )
         print("target val: ", target_val.shape)
 
         # Get projected distribution
-        target_z_projected = _l2_project(next_distr_v=target_val,
-                                         rewards_v=reward,
-                                         dones_mask_t=done,
-                                         gamma=self.gamma,
-                                         n_atoms=self.num_atoms,
-                                         v_min=self.v_min,
-                                         v_max=self.v_max,
-                                         delta_z=self.delta_z)
-        target_z_projected = torch.from_numpy(target_z_projected).float().to(self.device)
+        target_z_projected = _l2_project(
+            next_distr_v=target_val,
+            rewards_v=reward,
+            dones_mask_t=done,
+            gamma=self.gamma,
+            n_atoms=self.num_atoms,
+            v_min=self.v_min,
+            v_max=self.v_max,
+            delta_z=self.delta_z,
+        )
+        target_z_projected = (
+            torch.from_numpy(target_z_projected).float().to(self.device)
+        )
         print("target_z_projected: ", target_z_projected)
 
         # Get current Q estimate
@@ -228,8 +268,8 @@ class DistribDDPG:
         actor_loss *= torch.from_numpy(self.critic.z_atoms).float().to(self.device)
         actor_loss = torch.sum(actor_loss, dim=1)
         actor_loss = -actor_loss.mean()
-        
-        # Optimize the actor 
+
+        # Optimize the actor
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()
@@ -238,11 +278,19 @@ class DistribDDPG:
         _ = input("stop update step")
 
         # Update the frozen target models
-        for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
-            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        for param, target_param in zip(
+            self.critic.parameters(), self.critic_target.parameters()
+        ):
+            target_param.data.copy_(
+                self.tau * param.data + (1 - self.tau) * target_param.data
+            )
 
-        for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
-            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data) 
+        for param, target_param in zip(
+            self.actor.parameters(), self.actor_target.parameters()
+        ):
+            target_param.data.copy_(
+                self.tau * param.data + (1 - self.tau) * target_param.data
+            )
 
     def get_policy_state_dict(self) -> OrderedDict:
         return self.actor.state_dict()

@@ -19,6 +19,17 @@ def save_json_config(config: str, path: str):
         json.dump(config, f)
 
 
+class StdLogger:
+    def __init__(self, logdir: str | None = None, config: str | None = None):
+        pass
+
+    def log_scalar(self, tag: str, value: float, step: int):
+        logging.info(f"{tag}\t{value}\tat step {step}")
+
+    def log_video(self, tag: str, imgs, step: int):
+        logging.warning("Skipping logging video in STDOUT logger")
+
+
 class Logger:
     def __init__(self, logdir: str, config: str):
         self.writer = SummaryWriter(logdir)

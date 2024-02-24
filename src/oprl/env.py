@@ -4,9 +4,7 @@ import numpy as np
 from dm_control import suite
 
 
-
 class DMControlEnv:
-
     def __init__(self, env: str, seed: int):
         domain, task = env.split("-")
         self.random_state = np.random.RandomState(seed)
@@ -31,12 +29,14 @@ class DMControlEnv:
 
     def sample_action(self):
         spec = self.env.action_spec()
-        action = self.random_state.uniform(spec.minimum, spec.maximum, spec.shape) 
+        action = self.random_state.uniform(spec.minimum, spec.maximum, spec.shape)
         return action
 
     @property
     def observation_space(self):
-        return np.zeros(sum(int(np.prod(v.shape)) for v in self.env.observation_spec().values()))
+        return np.zeros(
+            sum(int(np.prod(v.shape)) for v in self.env.observation_spec().values())
+        )
 
     @property
     def action_space(self):
@@ -46,8 +46,11 @@ class DMControlEnv:
         """
         returned shape: [1, W, H, C]
         """
-        img = self.env.physics.render(camera_id=self._camera_id,
-                                       height=self._render_width, width=self._render_width)
+        img = self.env.physics.render(
+            camera_id=self._camera_id,
+            height=self._render_width,
+            width=self._render_width,
+        )
         img = img.astype(np.uint8)
         return np.expand_dims(img, 0)
 
@@ -69,4 +72,3 @@ def make_env(name: str, seed: int):
         name: Environment name.
     """
     return DMControlEnv(name, seed=seed)
-

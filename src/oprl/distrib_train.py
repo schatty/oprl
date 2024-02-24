@@ -12,18 +12,24 @@ from algos.ddpg import DDPG, DeterministicPolicy
 from distrib.distrib_runner import env_worker, policy_update_worker
 from trainers.buffers.episodic_buffer import EpisodicReplayBuffer
 from utils.logger import Logger
+
 print("Imports ok.")
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Run training')
+    parser = argparse.ArgumentParser(description="Run training")
     parser.add_argument("--config", type=str, help="Path to the config file.")
-    parser.add_argument("--env", type=str, default="cartpole-balance", help="Name of the environment.")
-    parser.add_argument("--device", type=str, default="cpu", help="Device to perform training on.")
+    parser.add_argument(
+        "--env", type=str, default="cartpole-balance", help="Name of the environment."
+    )
+    parser.add_argument(
+        "--device", type=str, default="cpu", help="Device to perform training on."
+    )
     return parser.parse_args()
 
 
 args = parse_args()
+
 
 def make_env(seed: int):
     """
@@ -31,6 +37,7 @@ def make_env(seed: int):
         name: Environment name.
     """
     return DMControlEnv(args.env, seed=seed)
+
 
 env = make_env(seed=0)
 
@@ -44,8 +51,9 @@ def make_policy():
         state_shape=STATE_SHAPE,
         action_shape=ACTION_SHAPE,
         hidden_units=[256, 256],
-        hidden_activation=nn.ReLU(inplace=True)
+        hidden_activation=nn.ReLU(inplace=True),
     )
+
 
 def make_buffer():
     buffer = EpisodicReplayBuffer(
@@ -53,16 +61,14 @@ def make_buffer():
         state_shape=STATE_SHAPE,
         action_shape=ACTION_SHAPE,
         device="cpu",
-        gamma=0.99
+        gamma=0.99,
     )
     return buffer
 
 
 def make_algo():
     time = datetime.now().strftime("%Y-%m-%d_%H_%M")
-    log_dir = os.path.join(
-        "logs_debug", "DDPG", 
-        f"DDPG-env_ENV-seedSEED-{time}")
+    log_dir = os.path.join("logs_debug", "DDPG", f"DDPG-env_ENV-seedSEED-{time}")
     print("LOGDIR: ", log_dir)
     logger = Logger(log_dir, {})
 
@@ -71,7 +77,7 @@ def make_algo():
         action_shape=ACTION_SHAPE,
         device="cpu",
         seed=0,
-        logger=logger
+        logger=logger,
     )
     return algo
 
@@ -84,8 +90,15 @@ if __name__ == "__main__":
     processes = []
 
     for i_env in range(ENV_WORKERS):
-        processes.append(Process(target=env_worker, args=(make_env, make_policy, i_env)))
-    processes.append(Process(target=policy_update_worker, args=(make_algo, make_env, make_buffer, ENV_WORKERS)))
+        processes.append(
+            Process(target=env_worker, args=(make_env, make_policy, i_env))
+        )
+    processes.append(
+        Process(
+            target=policy_update_worker,
+            args=(make_algo, make_env, make_buffer, ENV_WORKERS),
+        )
+    )
 
     for p in processes:
         p.start()

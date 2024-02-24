@@ -36,11 +36,11 @@ config = {
     "save_buffer": False,
     "visualise_every": 0,
     "estimate_q_every": 5000,
-    "log_every": 1000
+    "log_every": 1000,
 }
 
 # -----------------------------------
- 
+
 
 def make_algo(logger, seed):
     return SAC(
@@ -48,13 +48,13 @@ def make_algo(logger, seed):
         action_shape=ACTION_SHAPE,
         device=args.device,
         seed=seed,
-        logger=logger
+        logger=logger,
     )
 
 
 def make_logger(seed: int):
     log_dir = create_logdir(logdir="logs", algo="SAC", env=args.env, seed=seed)
-    #TODO: add config here instead {}
+    # TODO: add config here instead {}
     return Logger(log_dir, {})
 
 
@@ -67,7 +67,10 @@ if __name__ == "__main__":
         processes = []
         for seed in range(args.start_seed, args.start_seed + args.seeds):
             processes.append(
-                    Process(target=run_training, args=(make_algo, make_env, make_logger, config, seed))
+                Process(
+                    target=run_training,
+                    args=(make_algo, make_env, make_logger, config, seed),
+                )
             )
 
         for i, p in enumerate(processes):
@@ -78,4 +81,3 @@ if __name__ == "__main__":
             p.join()
 
     print("OK.")
-

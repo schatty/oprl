@@ -5,11 +5,28 @@ from oprl.trainers.buffers.episodic_buffer import EpisodicReplayBuffer
 
 
 class BaseTrainer:
-
-    def __init__(self, state_shape=None, action_shape=None, env=None, make_env_test=None, algo=None, buffer_size=int(1e6),
-                 gamma=0.99, device=None, num_steps=int(1e6), start_steps=int(10e3), batch_size=128,
-                 eval_interval=int(2e3), num_eval_episodes=10, save_buffer_every=0, visualise_every=0,
-                 estimate_q_every=0, stdout_log_every=int(1e5), seed=0, logger=None):
+    def __init__(
+        self,
+        state_shape=None,
+        action_shape=None,
+        env=None,
+        make_env_test=None,
+        algo=None,
+        buffer_size=int(1e6),
+        gamma=0.99,
+        device=None,
+        num_steps=int(1e6),
+        start_steps=int(10e3),
+        batch_size=128,
+        eval_interval=int(2e3),
+        num_eval_episodes=10,
+        save_buffer_every=0,
+        visualise_every=0,
+        estimate_q_every=0,
+        stdout_log_every=int(1e5),
+        seed=0,
+        logger=None,
+    ):
         """
         Args:
             state_shape: Shape of the state.
@@ -68,7 +85,9 @@ class BaseTrainer:
                 action = self.algo.explore(state)
             next_state, reward, terminated, truncated, _ = self.env.step(action)
 
-            self.buffer.append(state, action, reward, terminated, episode_done=terminated or truncated)
+            self.buffer.append(
+                state, action, reward, terminated, episode_done=terminated or truncated
+            )
             if terminated or truncated:
                 next_state, _ = self.env.reset(seed=self.seed)
                 ep_step = 0
@@ -83,9 +102,17 @@ class BaseTrainer:
                 mean_reward = self.evaluate()
                 self.logger.log_scalar("trainer/ep_reward", mean_reward, env_step)
                 self.logger.log_scalar("trainer/avg_reward", batch[2].mean(), env_step)
-                self.logger.log_scalar("trainer/buffer_transitions", len(self.buffer), env_step)
-                self.logger.log_scalar("trainer/buffer_episodes", self.buffer.num_episodes, env_step)
-                self.logger.log_scalar("trainer/buffer_last_ep_len", self.buffer.get_last_ep_len(), env_step)
+                self.logger.log_scalar(
+                    "trainer/buffer_transitions", len(self.buffer), env_step
+                )
+                self.logger.log_scalar(
+                    "trainer/buffer_episodes", self.buffer.num_episodes, env_step
+                )
+                self.logger.log_scalar(
+                    "trainer/buffer_last_ep_len",
+                    self.buffer.get_last_ep_len(),
+                    env_step,
+                )
 
             if self.visualize_every > 0 and env_step % self.visualize_every == 0:
                 imgs = self.visualise_policy()  # [T, W, H, C]
@@ -93,20 +120,26 @@ class BaseTrainer:
                     self.logger.log_video("eval_policy", imgs, env_step)
 
             if self.save_buffer_every > 0 and env_step % self.save_buffer_every == 0:
-                self.buffer.save(f"{self.log_dir}/buffers/buffer_step_{env_step}.pickle")
+                self.buffer.save(
+                    f"{self.log_dir}/buffers/buffer_step_{env_step}.pickle"
+                )
 
             if self.estimate_q_every > 0 and env_step % self.estimate_q_every == 0:
                 q_true = self.estimate_true_q()
                 q_critic = self.estimate_critic_q()
                 if q_true is not None:
-                    self.logger.log_scalar("trainer/Q-estimate", q_true,  env_step)
+                    self.logger.log_scalar("trainer/Q-estimate", q_true, env_step)
                     self.logger.log_scalar("trainer/Q-critic", q_critic, env_step)
-                    self.logger.log_scalar("trainer/Q_asb_diff", q_critic - q_true, env_step)
+                    self.logger.log_scalar(
+                        "trainer/Q_asb_diff", q_critic - q_true, env_step
+                    )
 
             if env_step % self.stdout_log_every == 0:
                 perc = int(env_step / self.num_steps * 100)
-                print(f"Env step {env_step:8d} ({perc:2d}%) Avg Reward {batch[2].mean():10.3f}"
-                      f"Ep Reward {mean_reward:10.3f}")
+                print(
+                    f"Env step {env_step:8d} ({perc:2d}%) Avg Reward {batch[2].mean():10.3f}"
+                    f"Ep Reward {mean_reward:10.3f}"
+                )
 
     def evaluate(self):
         returns = []
@@ -151,7 +184,7 @@ class BaseTrainer:
         try:
             qs = []
             for i_eval in range(eval_episodes):
-                env = self.make_env_test(seed = self.seed * 100 + i_eval)
+                env = self.make_env_test(seed=self.seed * 100 + i_eval)
                 state, _ = env.reset()
 
                 q = 0
@@ -159,7 +192,7 @@ class BaseTrainer:
                 while True:
                     action = self.algo.exploit(state)
                     state, r, terminated, truncated, _ = env.step(action)
-                    q += r * self.gamma ** s_i
+                    q += r * self.gamma**s_i
                     s_i += 1
                     if terminated or truncated:
                         break
@@ -172,7 +205,7 @@ class BaseTrainer:
             return None
 
     def estimate_critic_q(self, num_episodes=10):
-        qs = [] 
+        qs = []
         for i_eval in range(num_episodes):
             env = self.make_env_test(seed=self.seed * 100 + i_eval)
 
@@ -181,7 +214,7 @@ class BaseTrainer:
 
             state = torch.tensor(state).unsqueeze(0).float().to(self.device)
             action = torch.tensor(action).unsqueeze(0).float().to(self.device)
- 
+
             q = self.algo.critic(state, action)
             # TODO: TQC is not supported by this logic, need to update
             if isinstance(q, tuple):

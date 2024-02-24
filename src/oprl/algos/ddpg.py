@@ -13,7 +13,6 @@ from oprl.algos.utils import initialize_weight
 
 
 class DeterministicPolicy(nn.Module):
-
     def __init__(
         self,
         state_shape,

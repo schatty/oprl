@@ -43,7 +43,6 @@ def reparameterize(means, log_stds):
 
 
 class GaussianPolicy(nn.Module):
-
     def __init__(
         self,
         state_shape,
@@ -78,13 +77,12 @@ class GaussianPolicy(nn.Module):
 
 
 class SAC:
-
     def __init__(
         self,
         state_shape,
         action_shape,
-        device,
-        seed,
+        device="cpu",
+        seed=0,
         batch_size=256,
         tune_alpha=False,
         gamma=0.99,

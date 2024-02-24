@@ -1,14 +1,14 @@
 from setuptools import setup
 
 setup(
-    name='oprl',
-    version='1.0',
-    author='Igor Kuznetsov',
-    description='Reinforcement Learning Off-policy Algorithms with PyTorch',
-    long_description='todo',
-    url='todo',
-    keywords='reinforcement, learning, off-policy',
-    python_requires='>=3.7',
+    name="oprl",
+    version="1.0",
+    author="Igor Kuznetsov",
+    description="Reinforcement Learning Off-policy Algorithms with PyTorch",
+    long_description="todo",
+    url="todo",
+    keywords="reinforcement, learning, off-policy",
+    python_requires=">=3.7",
     # packages=find_packages(include=['exampleproject', 'exampleproject.*']),
     # install_requires=[
     #     'PyYAML',

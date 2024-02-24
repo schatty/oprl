@@ -19,10 +19,14 @@ logging.basicConfig(level=logging.INFO)
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Run training')
+    parser = argparse.ArgumentParser(description="Run training")
     parser.add_argument("--config", type=str, help="Path to the config file.")
-    parser.add_argument("--env", type=str, default="cartpole-balance", help="Name of the environment.")
-    parser.add_argument("--device", type=str, default="cpu", help="Device to perform training on.")
+    parser.add_argument(
+        "--env", type=str, default="cartpole-balance", help="Name of the environment."
+    )
+    parser.add_argument(
+        "--device", type=str, default="cpu", help="Device to perform training on."
+    )
     parser.add_argument("--seed", type=int, default=0, help="Random seed")
     return parser.parse_args()
 
@@ -36,8 +40,10 @@ N_EPISODES = 500  # Number of episodes each env worker would perform
 
 args = parse_args()
 
+
 def make_env(seed: int):
     return DMControlEnv(args.env, seed=seed)
+
 
 env = make_env(seed=0)
 STATE_SHAPE = env.observation_space.shape
@@ -77,7 +83,7 @@ def make_algo():
         action_shape=ACTION_SHAPE,
         device=args.device,
         seed=args.seed,
-        logger=logger
+        logger=logger,
     )
     return algo
 
@@ -87,8 +93,15 @@ if __name__ == "__main__":
     processes = []
 
     for i_env in range(ENV_WORKERS):
-        processes.append(Process(target=env_worker, args=(make_env, make_policy, N_EPISODES, i_env)))
-    processes.append(Process(target=policy_update_worker, args=(make_algo, make_env, make_buffer, ENV_WORKERS)))
+        processes.append(
+            Process(target=env_worker, args=(make_env, make_policy, N_EPISODES, i_env))
+        )
+    processes.append(
+        Process(
+            target=policy_update_worker,
+            args=(make_algo, make_env, make_buffer, ENV_WORKERS),
+        )
+    )
 
     for p in processes:
         p.start()
