@@ -1,22 +1,23 @@
-# D4PG-pytorch
+<img align="left" width="75" alt="oprl_logo" src="https://github.com/schatty/oprl/assets/23639048/c7ea0fee-3472-4d9c-86f3-9ab01f02222d">
 
-PyTorch implementation of Distributed Distributional Deterministic Policy Gradients (https://arxiv.org/abs/1804.08617).
-<p align="center">
-<img width="400" alt="d4pg_arch" src="https://user-images.githubusercontent.com/23639048/137602300-f2763ef1-2b67-4f76-aa8b-232afaa08a23.png">
-</p>
+# OPRL
+
+A Modular Library for Off-Policy Reinforcement Learning with a focus on SafeRL and distributed computing.
+
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 
-# About
-The project is under an active renovation, for the old code with `D4PG` algorithm working with multiprocessing queues and `mujoco_py` please refer to the branch `d4pg_legacy`.
+# Disclaimer 
+The project is under an active renovation, for the old code with D4PG algorithm working with multiprocessing queues and `mujoco_py` please refer to the branch `d4pg_legacy`.
 
 ### Roadmap 🏗
 - [x] Switching to `mujoco 3.1.1`
 - [x] Replacing multiprocessing queues with RabbitMQ for distributed RL
 - [x] Baselines with DDPG, TQC for `dm_control` for 1M step
-- [ ] Baselines with Distributed DDPG for `dm_control`
-- [ ] Bringing back D4PG logic on top of TQC
-- [ ] Tests
-- [ ] New Algos
+- [x] Tests
+- [ ] Support for SafetyGymnasium
+- [ ] Baselines with Distributed algorithms for `dm_control`
+- [ ] D4PG logic on top of TQC
 
 # Installation
 
@@ -42,6 +43,14 @@ docker run -it --rm --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3.12-ma
 Run training
 ```
 python src/oprl/configs/d3pg.py --env walker-walk
+```
+
+## Tests
+
+```
+cd src && pip install -e .
+cd .. && pip install -r tests/functional/requirements.txt
+python -m pytest tests
 ```
 
 ## Results
