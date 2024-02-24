@@ -1,8 +1,9 @@
 import json
-import shutil
+import logging
 import os
-import numpy as np
+import shutil
 
+import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -23,12 +24,11 @@ class Logger:
         self.writer = SummaryWriter(logdir)
 
         self._log_dir = logdir
-        self._tags_to_log_file = ("reward", )
+        self._tags_to_log_file = ("reward",)
 
-        print("Will copy file to ", logdir)
+        logging.info(f"Source code is copied to {logdir}")
         copy_exp_dir(logdir)
         save_json_config(config, os.path.join(logdir, "config.json"))
-
 
     def log_scalar(self, tag: str, value: float, step: int):
         self.writer.add_scalar(tag, value, step)
@@ -50,4 +50,3 @@ class Logger:
         os.makedirs(os.path.dirname(fn), exist_ok=True)
         with open(fn, "a") as f:
             f.write(f"{step} {val}\n")
-
