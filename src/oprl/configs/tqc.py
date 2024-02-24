@@ -1,15 +1,15 @@
+import argparse
 import logging
 import os
-from datetime import datetime
-import argparse
-from multiprocessing import Process
 from copy import copy, deepcopy
+from datetime import datetime
+from multiprocessing import Process
 
-from oprl.trainers.base_trainer import run_training
 from oprl.algos.tqc import TQC
-from oprl.utils.logger import Logger
+from oprl.configs.utils import create_logdir, parse_args
 from oprl.env import DMControlEnv
-from oprl.configs.utils import parse_args, create_logdir
+from oprl.trainers.base_trainer import run_training
+from oprl.utils.logger import Logger
 
 logging.basicConfig(level=logging.INFO)
 
@@ -30,17 +30,17 @@ ACTION_SHAPE = env.action_space.shape
 config = {
     "state_shape": STATE_SHAPE,
     "action_shape": ACTION_SHAPE,
-    "num_steps": int(15_000),
+    "num_steps": int(1_000_000),
     "eval_every": 2500,
     "device": args.device,
     "save_buffer": False,
     "visualise_every": 0,
     "estimate_q_every": 0,  # TODO: Here is the unsupported logic
-    "log_every": 2500
+    "log_every": 2500,
 }
 
 # -----------------------------------
- 
+
 
 def make_algo(logger, seed):
     return TQC(
@@ -48,13 +48,13 @@ def make_algo(logger, seed):
         action_shape=ACTION_SHAPE,
         device=args.device,
         seed=seed,
-        logger=logger
+        logger=logger,
     )
 
 
 def make_logger(seed: int):
     log_dir = create_logdir(logdir="logs", algo="TQC", env=args.env, seed=seed)
-    #TODO: add config here instead {}
+    # TODO: add config here instead {}
     return Logger(log_dir, {})
 
 
@@ -67,7 +67,10 @@ if __name__ == "__main__":
         processes = []
         for seed in range(args.start_seed, args.start_seed + args.seeds):
             processes.append(
-                    Process(target=run_training, args=(make_algo, make_env, make_logger, config, seed))
+                Process(
+                    target=run_training,
+                    args=(make_algo, make_env, make_logger, config, seed),
+                )
             )
 
         for i, p in enumerate(processes):
@@ -78,4 +81,3 @@ if __name__ == "__main__":
             p.join()
 
     print("OK.")
-
