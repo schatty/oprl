@@ -1,0 +1,7 @@
+@software{oprl,
+  author = {Kuznetsov, Igor},
+  title = {OPRL: Off-Policy Reinforcement Learning Library},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/schatty/oprl}},
+}
