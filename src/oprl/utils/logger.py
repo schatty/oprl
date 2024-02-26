@@ -35,7 +35,7 @@ class Logger:
         self.writer = SummaryWriter(logdir)
 
         self._log_dir = logdir
-        self._tags_to_log_file = ("reward",)
+        # self._tags_to_log_file = ("reward",)
 
         logging.info(f"Source code is copied to {logdir}")
         copy_exp_dir(logdir)
@@ -44,9 +44,10 @@ class Logger:
     def log_scalar(self, tag: str, value: float, step: int):
         self.writer.add_scalar(tag, value, step)
 
-        for tag_keyword in self._tags_to_log_file:
-            if tag_keyword in tag:
-                self._log_scalar_to_file(tag, value, step)
+        # TODO: Check if it's ok to log everythin
+        # for tag_keyword in self._tags_to_log_file:
+        #     if tag_keyword in tag:
+        self._log_scalar_to_file(tag, value, step)
 
     def log_video(self, tag: str, imgs, step: int):
         # TODO: Log to TensorBoard
