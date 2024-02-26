@@ -7,9 +7,9 @@ from multiprocessing import Process
 
 from oprl.algos.tqc import TQC
 from oprl.configs.utils import create_logdir, parse_args
-from oprl.env import DMControlEnv
-from oprl.trainers.base_trainer import run_training
+from oprl.env import make_env as _make_env
 from oprl.utils.logger import Logger
+from oprl.utils.run_training import run_training
 
 logging.basicConfig(level=logging.INFO)
 
@@ -17,10 +17,10 @@ args = parse_args()
 
 
 def make_env(seed: int):
-    return DMControlEnv(args.env, seed=seed)
+    return _make_env(args.env, seed=seed)
 
 
-env = DMControlEnv(args.env, seed=0)
+env = make_env(seed=0)
 STATE_SHAPE = env.observation_space.shape
 ACTION_SHAPE = env.action_space.shape
 

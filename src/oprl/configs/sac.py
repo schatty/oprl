@@ -1,15 +1,15 @@
+import argparse
 import logging
 import os
-from datetime import datetime
-import argparse
-from multiprocessing import Process
 from copy import copy, deepcopy
+from datetime import datetime
+from multiprocessing import Process
 
-from oprl.trainers.base_trainer import run_training
 from oprl.algos.sac import SAC
+from oprl.configs.utils import create_logdir, parse_args
+from oprl.env import make_env as _make_env
 from oprl.utils.logger import Logger
-from oprl.env import DMControlEnv
-from oprl.configs.utils import parse_args, create_logdir
+from oprl.utils.run_training import run_training
 
 logging.basicConfig(level=logging.INFO)
 
@@ -17,10 +17,10 @@ args = parse_args()
 
 
 def make_env(seed: int):
-    return DMControlEnv(args.env, seed=seed)
+    return _make_env(args.env, seed=seed)
 
 
-env = DMControlEnv(args.env, seed=0)
+env = make_env(seed=0)
 STATE_SHAPE = env.observation_space.shape
 ACTION_SHAPE = env.action_space.shape
 
@@ -30,7 +30,7 @@ ACTION_SHAPE = env.action_space.shape
 config = {
     "state_shape": STATE_SHAPE,
     "action_shape": ACTION_SHAPE,
-    "num_steps": int(15_000),
+    "num_steps": int(1_000_000),
     "eval_every": 2500,
     "device": args.device,
     "save_buffer": False,

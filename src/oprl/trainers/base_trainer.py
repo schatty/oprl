@@ -1,5 +1,5 @@
-import torch
 import numpy as np
+import torch
 
 from oprl.trainers.buffers.episodic_buffer import EpisodicReplayBuffer
 
@@ -74,8 +74,7 @@ class BaseTrainer:
 
     def train(self):
         ep_step = 0
-        mean_reward = 0
-        state, _ = self.env.reset(seed=self.seed)
+        state, _ = self.env.reset()
 
         for env_step in range(self.num_steps + 1):
             ep_step += 1
@@ -89,7 +88,7 @@ class BaseTrainer:
                 state, action, reward, terminated, episode_done=terminated or truncated
             )
             if terminated or truncated:
-                next_state, _ = self.env.reset(seed=self.seed)
+                next_state, _ = self.env.reset()
                 ep_step = 0
             state = next_state
 
@@ -98,54 +97,33 @@ class BaseTrainer:
             batch = self.buffer.sample(self.batch_size)
             self.algo.update(batch)
 
-            if env_step % self.eval_interval == 0:
-                mean_reward = self.evaluate()
-                self.logger.log_scalar("trainer/ep_reward", mean_reward, env_step)
-                self.logger.log_scalar("trainer/avg_reward", batch[2].mean(), env_step)
-                self.logger.log_scalar(
-                    "trainer/buffer_transitions", len(self.buffer), env_step
-                )
-                self.logger.log_scalar(
-                    "trainer/buffer_episodes", self.buffer.num_episodes, env_step
-                )
-                self.logger.log_scalar(
-                    "trainer/buffer_last_ep_len",
-                    self.buffer.get_last_ep_len(),
-                    env_step,
-                )
+            self._eval_routine(env_step, batch)
+            self._visualize(env_step)
+            self._save_buffer(env_step)
+            self._log_stdout(env_step, batch)
 
-            if self.visualize_every > 0 and env_step % self.visualize_every == 0:
-                imgs = self.visualise_policy()  # [T, W, H, C]
-                if imgs is not None:
-                    self.logger.log_video("eval_policy", imgs, env_step)
+    def _eval_routine(self, env_step: int, batch):
+        if env_step % self.eval_interval == 0:
+            self._log_evaluation(env_step)
 
-            if self.save_buffer_every > 0 and env_step % self.save_buffer_every == 0:
-                self.buffer.save(
-                    f"{self.log_dir}/buffers/buffer_step_{env_step}.pickle"
-                )
+            self.logger.log_scalar("trainer/avg_reward", batch[2].mean(), env_step)
+            self.logger.log_scalar(
+                "trainer/buffer_transitions", len(self.buffer), env_step
+            )
+            self.logger.log_scalar(
+                "trainer/buffer_episodes", self.buffer.num_episodes, env_step
+            )
+            self.logger.log_scalar(
+                "trainer/buffer_last_ep_len",
+                self.buffer.get_last_ep_len(),
+                env_step,
+            )
 
-            if self.estimate_q_every > 0 and env_step % self.estimate_q_every == 0:
-                q_true = self.estimate_true_q()
-                q_critic = self.estimate_critic_q()
-                if q_true is not None:
-                    self.logger.log_scalar("trainer/Q-estimate", q_true, env_step)
-                    self.logger.log_scalar("trainer/Q-critic", q_critic, env_step)
-                    self.logger.log_scalar(
-                        "trainer/Q_asb_diff", q_critic - q_true, env_step
-                    )
-
-            if env_step % self.stdout_log_every == 0:
-                perc = int(env_step / self.num_steps * 100)
-                print(
-                    f"Env step {env_step:8d} ({perc:2d}%) Avg Reward {batch[2].mean():10.3f}"
-                    f"Ep Reward {mean_reward:10.3f}"
-                )
-
-    def evaluate(self):
+    def _log_evaluation(self, env_step: int):
         returns = []
         for i_ep in range(self.num_eval_episodes):
             env_test = self.make_env_test(seed=self.seed + i_ep)
-            state, _ = env_test.reset(seed=self.seed + i_ep)
+            state, _ = env_test.reset()
 
             episode_return = 0.0
             terminated, truncated = False, False
@@ -158,7 +136,35 @@ class BaseTrainer:
             returns.append(episode_return)
 
         mean_return = np.mean(returns)
-        return mean_return
+        self.logger.log_scalar("trainer/ep_reward", mean_return, env_step)
+
+    def _visualize(self, env_step: int):
+        if self.visualize_every > 0 and env_step % self.visualize_every == 0:
+            imgs = self.visualise_policy()  # [T, W, H, C]
+            if imgs is not None:
+                self.logger.log_video("eval_policy", imgs, env_step)
+
+    def _save_buffer(self, env_step: int):
+        if self.save_buffer_every > 0 and env_step % self.save_buffer_every == 0:
+            self.buffer.save(f"{self.log_dir}/buffers/buffer_step_{env_step}.pickle")
+
+    def _estimate_q(self, env_step):
+        if self.estimate_q_every > 0 and env_step % self.estimate_q_every == 0:
+            q_true = self.estimate_true_q()
+            q_critic = self.estimate_critic_q()
+            if q_true is not None:
+                self.logger.log_scalar("trainer/Q-estimate", q_true, env_step)
+                self.logger.log_scalar("trainer/Q-critic", q_critic, env_step)
+                self.logger.log_scalar(
+                    "trainer/Q_asb_diff", q_critic - q_true, env_step
+                )
+
+    def _log_stdout(self, env_step: int, batch):
+        if env_step % self.stdout_log_every == 0:
+            perc = int(env_step / self.num_steps * 100)
+            print(
+                f"Env step {env_step:8d} ({perc:2d}%) Avg Reward {batch[2].mean():10.3f}"
+            )
 
     def visualise_policy(self):
         """
@@ -167,7 +173,7 @@ class BaseTrainer:
         env = self.make_env_test(seed=self.seed)
         try:
             imgs = []
-            state, _ = env.reset(seed=self.seed)
+            state, _ = env.reset()
             done = False
             while not done:
                 img = env.render()
@@ -185,6 +191,7 @@ class BaseTrainer:
             qs = []
             for i_eval in range(eval_episodes):
                 env = self.make_env_test(seed=self.seed * 100 + i_eval)
+                print("Before reset etimate q")
                 state, _ = env.reset()
 
                 q = 0
@@ -228,7 +235,6 @@ class BaseTrainer:
 def run_training(make_algo, make_env, make_logger, config, seed):
     env = make_env(seed=seed)
     logger = make_logger(seed)
-    print("env created.")
 
     trainer = BaseTrainer(
         state_shape=config["state_shape"],
@@ -246,7 +252,5 @@ def run_training(make_algo, make_env, make_logger, config, seed):
         seed=seed,
         logger=logger,
     )
-    print("Trainer created.")
 
     trainer.train()
-    print("Training end.")
