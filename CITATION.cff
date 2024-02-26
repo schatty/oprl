@@ -1,6 +1,6 @@
 @software{oprl,
   author = {Kuznetsov, Igor},
-  title = {OPRL: Off-Policy Reinforcement Learning Library},
+  title = {{OPRL: Off-Policy Reinforcement Learning Library}},
   publisher = {GitHub},
   journal = {GitHub repository},
   url = {https://github.com/schatty/oprl}
