@@ -2,7 +2,7 @@ import math
 from copy import deepcopy
 
 import numpy as np
-import torch
+import torch as t
 import torch.nn.functional as F
 from torch import nn
 from torch.optim import Adam
@@ -11,7 +11,7 @@ from oprl.algos.nn import MLP, DoubleCritic
 from oprl.algos.utils import Clamp, disable_gradient, initialize_weight, soft_update
 
 
-def calculate_gaussian_log_prob(log_stds, noises):
+def calculate_gaussian_log_prob(log_stds: t.Tensor, noises: t.Tensor) -> t.Tensor:
     # NOTE: We only use multivariate gaussian distribution with diagonal
     # covariance matrix,  which can be viewed as simultaneous distribution of
     # gaussian distributions, p_i(u). So, log_probs = \sum_i log p_i(u).
@@ -36,40 +36,38 @@ def calculate_log_pi(log_stds, noises, us):
 
 def reparameterize(means, log_stds):
     stds = log_stds.exp()
-    noises = torch.randn_like(means)
+    noises = t.randn_like(means)
     x = means + noises * stds
-    actions = torch.tanh(x)
+    actions = t.tanh(x)
     return actions, calculate_log_pi(log_stds, noises, x)
 
 
 class GaussianPolicy(nn.Module):
     def __init__(
         self,
-        state_shape,
-        action_shape,
-        hidden_units=(256, 256),
-        hidden_activation=nn.ReLU(inplace=True),
+        state_dim: int,
+        action_dim: int,
+        hidden_units: tuple[int, ...] = (256, 256),
+        hidden_activation: t.nn.Module = nn.ReLU(inplace=True),
     ):
         super().__init__()
 
         self.mlp = MLP(
-            input_dim=state_shape[0],
+            input_dim=state_dim,
             output_dim=hidden_units[-1],
             hidden_units=hidden_units[:-1],
             hidden_activation=hidden_activation,
             output_activation=hidden_activation,
         )  # .apply(initialize_weight)
 
-        self.mean = nn.Linear(hidden_units[-1], action_shape[0]).apply(
-            initialize_weight
-        )
+        self.mean = nn.Linear(hidden_units[-1], action_dim).apply(initialize_weight)
 
         self.log_std = nn.Sequential(
-            nn.Linear(hidden_units[-1], action_shape[0]), Clamp()
+            nn.Linear(hidden_units[-1], action_dim), Clamp()
         ).apply(initialize_weight)
 
     def forward(self, states):
-        return torch.tanh(self.mean(self.mlp(states)))
+        return t.tanh(self.mean(self.mlp(states)))
 
     def sample(self, states):
         x = self.mlp(states)
@@ -109,15 +107,15 @@ class SAC:
         self.log_every = log_every
 
         self.actor = GaussianPolicy(
-            state_shape=self.state_shape,
-            action_shape=self.action_shape,
+            state_dim=self.state_shape,
+            action_dim=self.action_shape,
             hidden_units=[256, 256],
             hidden_activation=nn.ReLU(inplace=True),
         ).to(self.device)
 
         self.critic = DoubleCritic(
-            state_shape=self.state_shape,
-            action_shape=self.action_shape,
+            state_dim=self.state_shape,
+            action_dim=self.action_shape,
             hidden_units=[256, 256],
             hidden_activation=nn.ReLU(inplace=True),
         ).to(self.device)

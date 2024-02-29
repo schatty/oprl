@@ -1,4 +1,6 @@
-import torch
+import numpy as np
+import numpy.typing as npt
+import torch as t
 import torch.nn as nn
 
 from oprl.algos.utils import initialize_weight
@@ -7,121 +9,70 @@ from oprl.algos.utils import initialize_weight
 class Critic(nn.Module):
     def __init__(
         self,
-        state_shape,
-        action_shape,
-        hidden_units=(256, 256),
-        hidden_activation=nn.ReLU(inplace=True),
+        state_dim: int,
+        action_dim: int,
+        hidden_units: tuple[int, ...] = (256, 256),
+        hidden_activation: nn.Module = nn.ReLU(inplace=True),
     ):
         super().__init__()
 
         self.q1 = MLP(
-            input_dim=state_shape[0] + action_shape[0],
+            input_dim=state_dim + action_dim,
             output_dim=1,
             hidden_units=hidden_units,
             hidden_activation=hidden_activation,
         )
 
-    def forward(self, states, actions):
-        x = torch.cat([states, actions], dim=-1)
+    def forward(self, states: t.Tensor, actions: t.Tensor):
+        x = t.cat([states, actions], dim=-1)
         return self.q1(x)
 
-    def Q1(self, states, actions):
-        x = torch.cat([states, actions], dim=-1)
+    def Q1(self, states: t.Tensor, actions: t.Tensor) -> t.Tensor:
+        x = t.cat([states, actions], dim=-1)
         return self.q1(x)
 
 
 class DoubleCritic(nn.Module):
     def __init__(
         self,
-        state_shape,
-        action_shape,
-        hidden_units=(256, 256),
-        hidden_activation=nn.ReLU(inplace=True),
+        state_dim: int,
+        action_dim: int,
+        hidden_units: tuple[int, ...] = (256, 256),
+        hidden_activation: nn.Module = nn.ReLU(inplace=True),
     ):
         super().__init__()
 
         self.q1 = MLP(
-            input_dim=state_shape[0] + action_shape[0],
+            input_dim=state_dim + action_dim,
             output_dim=1,
             hidden_units=hidden_units,
             hidden_activation=hidden_activation,
         )
 
         self.q2 = MLP(
-            input_dim=state_shape[0] + action_shape[0],
+            input_dim=state_dim + action_dim,
             output_dim=1,
             hidden_units=hidden_units,
             hidden_activation=hidden_activation,
         )
 
-    def forward(self, states, actions):
-        x = torch.cat([states, actions], dim=-1)
+    def forward(self, states: t.Tensor, actions: t.Tensor) -> tuple[t.Tensor, t.Tensor]:
+        x = t.cat([states, actions], dim=-1)
         return self.q1(x), self.q2(x)
 
-    def Q1(self, states, actions):
-        x = torch.cat([states, actions], dim=-1)
+    def Q1(self, states: t.Tensor, actions: t.Tensor) -> t.Tensor:
+        x = t.cat([states, actions], dim=-1)
         return self.q1(x)
-
-
-class MCCritic(nn.Module):
-    def __init__(
-        self,
-        state_shape,
-        action_shape,
-        hidden_units=(256, 256),
-        hidden_activation=nn.ReLU(inplace=True),
-    ):
-        super().__init__()
-
-        self.q1 = MLP(
-            input_dim=state_shape[0] + action_shape[0],
-            output_dim=1,
-            hidden_units=hidden_units,
-            hidden_activation=hidden_activation,
-        )
-
-        self.q2 = MLP(
-            input_dim=state_shape[0] + action_shape[0],
-            output_dim=1,
-            hidden_units=hidden_units,
-            hidden_activation=hidden_activation,
-        )
-
-        self.q3 = MLP(
-            input_dim=state_shape[0] + action_shape[0],
-            output_dim=1,
-            hidden_units=hidden_units,
-            hidden_activation=hidden_activation,
-        )
-
-    def forward(self, states, actions):
-        x = torch.cat([states, actions], dim=-1)
-        return self.q1(x), self.q2(x), self.q3(x)
-
-    def Q1(self, states, actions):
-        x = torch.cat([states, actions], dim=-1)
-        return self.q1(x)
-
-    def get_action_grad(self, optim, states, actions):  # , actions):
-        q1, q2, q3 = self.forward(states, actions)
-        q_cat = torch.cat((q1, q2, q3), dim=1).flatten()
-        var = torch.var(q_cat)
-
-        optim.zero_grad()
-        var.backward(retain_graph=True)
-        da = torch.autograd.grad(var, actions)
-
-        return da[0] + 1e-8
 
 
 class MLP(nn.Module):
     def __init__(
         self,
-        input_dim,
-        output_dim,
-        hidden_units=(64, 64),
-        hidden_activation=nn.Tanh(),
-        output_activation=nn.Identity(),
+        input_dim: int,
+        output_dim: int,
+        hidden_units: tuple[int, ...] = (64, 64),
+        hidden_activation: nn.Module = nn.Tanh(),
+        output_activation: nn.Module = nn.Identity(),
     ):
         super().__init__()
 
@@ -136,12 +87,47 @@ class MLP(nn.Module):
 
         self.nn = nn.Sequential(*layers).apply(initialize_weight)
 
-    def forward(self, x):
+    def forward(self, x: t.Tensor) -> t.Tensor:
         return self.nn(x)
 
-    def get_layer_norm(self):
-        total_norm = 0
-        for p in self.nn.parameters():
-            param_norm = p.grad.detach().data.norm(2)
-            total_norm += param_norm.item() ** 2
-        return total_norm**0.5
+
+class DeterministicPolicy(nn.Module):
+    def __init__(
+        self,
+        state_dim: int,
+        action_dim: int,
+        hidden_units: tuple[int, ...] = (256, 256),
+        hidden_activation=nn.ReLU(inplace=True),
+        max_action: float = 1.0,
+        device: str = "cpu",
+    ):
+        super().__init__()
+
+        self.mlp = MLP(
+            input_dim=state_dim,
+            output_dim=action_dim,
+            hidden_units=hidden_units,
+            hidden_activation=hidden_activation,
+        ).apply(initialize_weight)
+
+        self._device = device
+        self._action_shape = action_dim
+        self._max_action = max_action
+
+    def forward(self, states: t.Tensor) -> t.Tensor:
+        return t.tanh(self.mlp(states))
+
+    def exploit(self, state: npt.ArrayLike) -> npt.NDArray:
+        state = t.tensor(state).unsqueeze_(0).to(self._device)
+        return self.forward(state).cpu().numpy().flatten()
+
+    def explore(self, state: npt.ArrayLike) -> npt.NDArray:
+        state = t.tensor(state, device=self._device).unsqueeze_(0)
+
+        # TODO: Set exploration noise of 0.1 as the property of the agent
+        with t.no_grad():
+            noise = (t.randn(self._action_shape) * 0.1).to(self._device)
+            action = self.mlp(state) + noise
+
+        a = action.cpu().numpy()[0]
+        return np.clip(a, -self._max_action, self._max_action)

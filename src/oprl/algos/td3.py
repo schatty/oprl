@@ -6,29 +6,8 @@ import torch.nn.functional as F
 from torch import nn
 from torch.optim import Adam
 
-from oprl.algos.nn import MLP, DoubleCritic
+from oprl.algos.nn import MLP, DeterministicPolicy, DoubleCritic
 from oprl.algos.utils import disable_gradient, initialize_weight, soft_update
-
-
-class DeterministicPolicy(nn.Module):
-    def __init__(
-        self,
-        state_shape,
-        action_shape,
-        hidden_units=(256, 256),
-        hidden_activation=nn.ReLU(inplace=True),
-    ):
-        super().__init__()
-
-        self.mlp = MLP(
-            input_dim=state_shape[0],
-            output_dim=action_shape[0],
-            hidden_units=hidden_units,
-            hidden_activation=hidden_activation,
-        ).apply(initialize_weight)
-
-    def forward(self, states):
-        return torch.tanh(self.mlp(states))
 
 
 class TD3:
@@ -36,7 +15,6 @@ class TD3:
         self,
         state_shape,
         action_shape,
-        device="cpu",
         seed=0,
         batch_size=256,
         policy_noise=0.2,
@@ -49,6 +27,7 @@ class TD3:
         max_action=1.0,
         target_update_coef=5e-3,
         log_every=5000,
+        device="cpu",
         logger=None,
     ):
         np.random.seed(seed)
@@ -72,8 +51,8 @@ class TD3:
         self.logger = logger
 
         self.actor = DeterministicPolicy(
-            state_shape=self.state_shape,
-            action_shape=self.action_shape,
+            state_dim=self.state_shape,
+            action_dim=self.action_shape,
             hidden_units=[256, 256],
             hidden_activation=nn.ReLU(inplace=True),
         ).to(self.device)
@@ -81,8 +60,8 @@ class TD3:
         self.actor_target = deepcopy(self.actor).to(self.device).eval()
 
         self.critic = DoubleCritic(
-            state_shape=self.state_shape,
-            action_shape=self.action_shape,
+            state_dim=self.state_shape,
+            action_dim=self.action_shape,
             hidden_units=[256, 256],
             hidden_activation=nn.ReLU(inplace=True),
         ).to(self.device)
