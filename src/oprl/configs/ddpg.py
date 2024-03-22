@@ -45,8 +45,8 @@ config = {
 
 def make_algo(logger, seed):
     return DDPG(
-        state_shape=STATE_SHAPE,
-        action_shape=ACTION_SHAPE,
+        state_dim=STATE_SHAPE,
+        action_dim=ACTION_SHAPE,
         device=args.device,
         seed=seed,
         logger=logger,
