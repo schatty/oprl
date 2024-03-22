@@ -4,7 +4,6 @@ from typing import Any, Dict
 import numpy as np
 import numpy.typing as npt
 import torch as t
-import torch.nn.functional as F
 from torch import nn
 
 from oprl.algos.nn import Critic, DeterministicPolicy
@@ -47,12 +46,13 @@ class DDPG:
         self._batch_size = batch_size
         self._max_action = max_action
         self._device = device
-
         self._logger = logger
 
     def exploit(self, state: npt.ArrayLike):
-        state = t.tensor(state).unsqueeze_(0).to(self._device)
-        return self.actor(state).cpu().numpy().flatten()
+        state = t.tensor(state, device=self._device).unsqueeze_(0)
+        with t.no_grad():
+            action = self.actor(state).cpu()
+        return action.numpy().flatten()
 
     # TODO: remove explore from algo to agent completely
     def explore(self, state: npt.ArrayLike):
@@ -75,25 +75,8 @@ class DDPG:
         done: t.Tensor,
         next_state: t.Tensor,
     ):
-        # Critic
-
-        target_Q = self.critic_target(next_state, self.actor_target(next_state))
-        target_Q = reward + (1.0 - done) * self._discount * target_Q.detach()
-        current_Q = self.critic(state, action)
-
-        critic_loss = F.mse_loss(current_Q, target_Q)
-
-        self.critic_optimizer.zero_grad()
-        critic_loss.backward()
-        self.critic_optimizer.step()
-
-        # Actor
-
-        actor_loss = -self.critic(state, self.actor(state)).mean()
-
-        self.actor_optimizer.zero_grad()
-        actor_loss.backward()
-        self.actor_optimizer.step()
+        self._update_critic(state, action, reward, done, next_state)
+        self._update_actor(state)
 
         # Update the frozen target models
         for param, target_param in zip(
@@ -109,6 +92,31 @@ class DDPG:
             target_param.data.copy_(
                 self._tau * param.data + (1 - self._tau) * target_param.data
             )
+
+    def _update_critic(
+        self,
+        state: t.Tensor,
+        action: t.Tensor,
+        reward: t.Tensor,
+        done: t.Tensor,
+        next_state: t.Tensor,
+    ) -> None:
+        target_Q = self.critic_target(next_state, self.actor_target(next_state))
+        target_Q = reward + (1.0 - done) * self._discount * target_Q.detach()
+        current_Q = self.critic(state, action)
+
+        critic_loss = (current_Q - target_Q).pow(2).mean()
+
+        self.critic_optimizer.zero_grad()
+        critic_loss.backward()
+        self.critic_optimizer.step()
+
+    def _update_actor(self, state: t.Tensor) -> None:
+        actor_loss = -self.critic(state, self.actor(state)).mean()
+
+        self.actor_optimizer.zero_grad()
+        actor_loss.backward()
+        self.actor_optimizer.step()
 
     def get_policy_state_dict(self) -> Dict[str, Any]:
         return self.actor.state_dict()

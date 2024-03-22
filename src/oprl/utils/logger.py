@@ -2,10 +2,9 @@ import json
 import logging
 import os
 import shutil
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 import numpy as np
-from abs import ABC
 from torch.utils.tensorboard import SummaryWriter
 
 

@@ -2,11 +2,10 @@ from copy import deepcopy
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 from torch import nn
 from torch.optim import Adam
 
-from oprl.algos.nn import MLP, DeterministicPolicy, DoubleCritic
+from oprl.algos.nn import DeterministicPolicy, DoubleCritic
 from oprl.algos.utils import disable_gradient, initialize_weight, soft_update
 
 
@@ -101,7 +100,6 @@ class TD3:
         q1, q2 = self.critic(states, actions)
 
         with torch.no_grad():
-            # Select action according to policy and add clipped noise
             noise = (torch.randn_like(actions) * self.policy_noise).clamp(
                 -self.noise_clip, self.noise_clip
             )
@@ -164,4 +162,4 @@ class TD3:
         state = torch.tensor(state, dtype=self.dtype, device=self.device).unsqueeze_(0)
         with torch.no_grad():
             action = self.actor(state)
-        return action.cpu().numpy()[0]
+        return action.cpu().numpy().flatten()
