@@ -7,6 +7,7 @@ import torch as t
 from torch import nn
 
 from oprl.algos.nn import Critic, DeterministicPolicy
+from oprl.algos.utils import disable_gradient
 from oprl.utils.logger import Logger, StdLogger
 
 
@@ -16,6 +17,7 @@ class DDPG:
         state_dim: int,
         action_dim: int,
         max_action: float = 1,
+        expl_noise: float = 0.1,
         discount: float = 0.99,
         tau: float = 5e-3,
         batch_size: int = 256,
@@ -23,23 +25,11 @@ class DDPG:
         seed: int = 0,
         logger: Logger = StdLogger(),
     ):
+        # TODO: move seed setting into the entrypoint
         np.random.seed(seed)
         t.manual_seed(seed)
 
-        self.actor = DeterministicPolicy(
-            state_dim=state_dim,
-            action_dim=action_dim,
-            hidden_units=(256, 256),
-            hidden_activation=nn.ReLU(inplace=True),
-        ).to(device)
-        self.actor_target = deepcopy(self.actor)
-        self.actor_optimizer = t.optim.Adam(self.actor.parameters(), lr=3e-4)
-
-        self.critic = Critic(state_dim, action_dim).to(device)
-        self.critic_target = deepcopy(self.critic)
-        self.critic_optimizer = t.optim.Adam(self.critic.parameters(), lr=3e-4)
-
-        self._expl_noise = 0.1
+        self._expl_noise = expl_noise
         self._action_dim = action_dim
         self._discount = discount
         self._tau = tau
@@ -48,24 +38,20 @@ class DDPG:
         self._device = device
         self._logger = logger
 
-    def exploit(self, state: npt.ArrayLike):
-        state = t.tensor(state, device=self._device).unsqueeze_(0)
-        with t.no_grad():
-            action = self.actor(state).cpu()
-        return action.numpy().flatten()
+        self.actor = DeterministicPolicy(
+            state_dim=state_dim,
+            action_dim=action_dim,
+            hidden_units=(256, 256),
+            hidden_activation=nn.ReLU(inplace=True),
+        ).to(device)
+        self.actor_target = deepcopy(self.actor)
+        disable_gradient(self.actor_target)
+        self.optim_actor = t.optim.Adam(self.actor.parameters(), lr=3e-4)
 
-    # TODO: remove explore from algo to agent completely
-    def explore(self, state: npt.ArrayLike):
-        state = t.tensor(state, device=self._device).unsqueeze_(0)
-
-        with t.no_grad():
-            noise = (
-                t.randn(self._action_dim) * self._max_action * self._expl_noise
-            ).to(self._device)
-            action = self.actor(state) + noise
-
-        a = action.cpu().numpy()[0]
-        return np.clip(a, -self._max_action, self._max_action)
+        self.critic = Critic(state_dim, action_dim).to(device)
+        self.critic_target = deepcopy(self.critic)
+        disable_gradient(self.critic_target)
+        self.optim_critic = t.optim.Adam(self.critic.parameters(), lr=3e-4)
 
     def update(
         self,
@@ -107,16 +93,35 @@ class DDPG:
 
         critic_loss = (current_Q - target_Q).pow(2).mean()
 
-        self.critic_optimizer.zero_grad()
+        self.optim_critic.zero_grad()
         critic_loss.backward()
-        self.critic_optimizer.step()
+        self.optim_critic.step()
 
     def _update_actor(self, state: t.Tensor) -> None:
         actor_loss = -self.critic(state, self.actor(state)).mean()
 
-        self.actor_optimizer.zero_grad()
+        self.optim_actor.zero_grad()
         actor_loss.backward()
-        self.actor_optimizer.step()
+        self.optim_actor.step()
+
+    def exploit(self, state: npt.ArrayLike) -> npt.ArrayLike:
+        state = t.tensor(state, device=self._device).unsqueeze_(0)
+        with t.no_grad():
+            action = self.actor(state).cpu()
+        return action.numpy().flatten()
+
+    # TODO: remove explore from algo to agent completely
+    def explore(self, state: npt.ArrayLike) -> npt.ArrayLike:
+        state = t.tensor(state, device=self._device).unsqueeze_(0)
+
+        with t.no_grad():
+            noise = (
+                t.randn(self._action_dim) * self._max_action * self._expl_noise
+            ).to(self._device)
+            action = self.actor(state) + noise
+
+        a = action.cpu().numpy()[0]
+        return np.clip(a, -self._max_action, self._max_action)
 
     def get_policy_state_dict(self) -> Dict[str, Any]:
         return self.actor.state_dict()

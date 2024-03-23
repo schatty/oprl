@@ -2,8 +2,12 @@ import numpy as np
 import numpy.typing as npt
 import torch as t
 import torch.nn as nn
+from torch.distributions import Distribution, Normal
+from torch.nn.functional import logsigmoid
 
 from oprl.algos.utils import initialize_weight
+
+LOG_STD_MIN_MAX = (-20, 2)
 
 
 class Critic(nn.Module):
@@ -85,7 +89,7 @@ class MLP(nn.Module):
         layers.append(nn.Linear(units, output_dim))
         layers.append(output_activation)
 
-        self.nn = nn.Sequential(*layers).apply(initialize_weight)
+        self.nn = nn.Sequential(*layers)
 
     def forward(self, x: t.Tensor) -> t.Tensor:
         return self.nn(x)
@@ -131,3 +135,50 @@ class DeterministicPolicy(nn.Module):
 
         a = action.cpu().numpy()[0]
         return np.clip(a, -self._max_action, self._max_action)
+
+
+class GaussianActor(nn.Module):
+    def __init__(self, state_dim, action_dim, hidden_units, hidden_activation, device):
+        super().__init__()
+        self.action_dim = action_dim
+        self.net = MLP(
+            state_dim, 2 * action_dim, hidden_units, hidden_activation=hidden_activation
+        )
+
+        self.device = device
+
+    def forward(self, obs: t.Tensor) -> tuple[t.Tensor, t.Tensor | None]:
+        mean, log_std = self.net(obs).split([self.action_dim, self.action_dim], dim=1)
+        log_std = log_std.clamp(*LOG_STD_MIN_MAX)
+
+        if self.training:
+            std = t.exp(log_std)
+            tanh_normal = TanhNormal(mean, std, self.device)
+            action, pre_tanh = tanh_normal.rsample()
+            log_prob = tanh_normal.log_prob(pre_tanh)
+            log_prob = log_prob.sum(dim=1, keepdim=True)
+        else:  # deterministic eval without log_prob computation
+            action = t.tanh(mean)
+            log_prob = None
+        return action, log_prob
+
+
+class TanhNormal(Distribution):
+    def __init__(self, normal_mean, normal_std, device):
+        super().__init__()
+        self.normal_mean = normal_mean
+        self.normal_std = normal_std
+        self.standard_normal = Normal(
+            t.zeros_like(self.normal_mean, device=device),
+            t.ones_like(self.normal_std, device=device),
+        )
+        self.normal = Normal(normal_mean, normal_std)
+
+    def log_prob(self, pre_tanh: t.Tensor) -> t.Tensor:
+        log_det = 2 * np.log(2) + logsigmoid(2 * pre_tanh) + logsigmoid(-2 * pre_tanh)
+        result = self.normal.log_prob(pre_tanh) - log_det
+        return result
+
+    def rsample(self) -> tuple[t.Tensor, t.Tensor]:
+        pretanh = self.normal_mean + self.normal_std * self.standard_normal.sample()
+        return t.tanh(pretanh), pretanh

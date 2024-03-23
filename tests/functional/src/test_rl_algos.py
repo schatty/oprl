@@ -7,15 +7,13 @@ from oprl.algos.td3 import TD3
 from oprl.algos.tqc import TQC
 from oprl.env import DMControlEnv
 
-rl_algo_classes = [DDPG]  # [DDPG, SAC, TD3, TQC]
+rl_algo_classes = [DDPG, SAC, TD3, TQC]
 
 
 @pytest.mark.parametrize("algo_class", rl_algo_classes)
 def test_rl_algo_run(algo_class):
     env = DMControlEnv("walker-walk", seed=0)
     obs, _ = env.reset(env.sample_action())
-
-    print("State shape ", env.observation_space.shape)
 
     algo = algo_class(
         state_dim=env.observation_space.shape[0],

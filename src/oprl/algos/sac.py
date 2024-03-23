@@ -8,11 +8,11 @@ import torch.nn.functional as F
 from torch import nn
 from torch.optim import Adam
 
-from oprl.algos.nn import MLP, DoubleCritic
+from oprl.algos.nn import MLP, DoubleCritic, GaussianActor
 from oprl.algos.utils import Clamp, disable_gradient, initialize_weight, soft_update
 from oprl.utils.logger import Logger, StdLogger
 
-
+"""
 def calculate_gaussian_log_prob(log_stds: t.Tensor, noises: t.Tensor) -> t.Tensor:
     # NOTE: We only use multivariate gaussian distribution with diagonal
     # covariance matrix,  which can be viewed as simultaneous distribution of
@@ -74,6 +74,7 @@ class GaussianPolicy(nn.Module):
     def sample(self, states: t.Tensor) -> tuple[t.Tensor, t.Tensor]:
         x = self.mlp(states)
         return reparameterize(self.mean(x), self.log_std(x))
+"""
 
 
 class SAC:
@@ -92,7 +93,7 @@ class SAC:
         device: str = "cpu",
         seed: int = 0,
         log_every: int = 5000,
-        logger: Logger = StdLogger,
+        logger: Logger = StdLogger(),
     ):
         np.random.seed(seed)
         t.manual_seed(seed)
@@ -108,12 +109,13 @@ class SAC:
         self._target_update_coef = target_update_coef
         self._log_every = log_every
 
-        self.actor = GaussianPolicy(
+        self.actor = GaussianActor(
             state_dim=self._state_dim,
-            action_dim=self._action_dim,
+            action_dim=action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(inplace=True),
-        ).to(self._device)
+            device=self._device,
+        )
 
         self.critic = DoubleCritic(
             state_dim=self._state_dim,
@@ -138,12 +140,6 @@ class SAC:
 
         self._logger = logger
 
-    def explore(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        state = t.tensor(state, device=self._device).unsqueeze_(0)
-        with t.no_grad():
-            action, _ = self.actor.sample(state)
-        return action.cpu().numpy()[0]
-
     def update(
         self,
         state: t.Tensor,
@@ -151,7 +147,7 @@ class SAC:
         reward: t.Tensor,
         done: t.Tensor,
         next_state: t.Tensor,
-    ):
+    ) -> None:
         self.update_critic(state, action, reward, done, next_state)
         self.update_actor(state)
         soft_update(self.critic_target, self.critic, self._target_update_coef)
@@ -165,10 +161,10 @@ class SAC:
         rewards: t.Tensor,
         dones: t.Tensor,
         next_states: t.Tensor,
-    ):
+    ) -> None:
         q1, q2 = self.critic(states, actions)
         with t.no_grad():
-            next_actions, log_pis = self.actor.sample(next_states)
+            next_actions, log_pis = self.actor(next_states)
             q1_next, q2_next = self.critic_target(next_states, next_actions)
             q_next = t.min(q1_next, q2_next) - self._alpha * log_pis
 
@@ -183,31 +179,18 @@ class SAC:
         self.optim_critic.step()
 
         if self._update_step % self._log_every == 0:
-            self._logger.log_scalar(
-                "algo/q1", q1.detach().mean().cpu(), self._update_step
-            )
-            self._logger.log_scalar(
-                "algo/q_target", q_target.mean().cpu(), self._update_step
-            )
-            self._logger.log_scalar(
-                "algo/abs_q_err",
-                (q1 - q_target).detach().mean().cpu(),
-                self._update_step,
-            )
-            self._logger.log_scalar(
-                "algo/critic_loss", loss_critic.item(), self._update_step
-            )
-            self._logger.log_scalar(
-                "algo/q1_grad_norm", self.critic.q1.get_layer_norm(), self._update_step
-            )
-            self._logger.log_scalar(
-                "algo/actor_grad_norm",
-                self.actor.mlp.get_layer_norm(),
+            self._logger.log_scalars(
+                {
+                    "algo/q1": q1.detach().mean().cpu(),
+                    "algo/q_target": q_target.mean().cpu(),
+                    "algo/abs_q_err": (q1 - q_target).detach().mean().cpu(),
+                    "algo/critic_loss": loss_critic.item(),
+                },
                 self._update_step,
             )
 
-    def update_actor(self, state: t.Tensor):
-        actions, log_pi = self.actor.sample(state)
+    def update_actor(self, state: t.Tensor) -> None:
+        actions, log_pi = self.actor(state)
         qs1, qs2 = self.critic(state, actions)
         loss_actor = self._alpha * log_pi.mean() - t.min(qs1, qs2).mean()
 
@@ -231,16 +214,23 @@ class SAC:
                 self._logger.log_scalar(
                     "algo/loss_alpha", loss_alpha.item(), self._update_step
                 )
-            self._logger.log_scalar(
-                "algo/loss_actor", loss_actor.item(), self._update_step
-            )
-            self._logger.log_scalar("algo/alpha", self._alpha, self._update_step)
-            self._logger.log_scalar(
-                "algo/log_pi", log_pi.cpu().mean(), self._update_step
+            self._logger.log_scalars(
+                {
+                    "algo/loss_actor": loss_actor.item(),
+                    "algo/alpha": self._alpha,
+                    "algo/log_pi": log_pi.cpu().mean(),
+                },
+                self._update_step,
             )
 
-    def exploit(self, state: npt.ArrayLike) -> npt.ArrayLike:
+    def explore(self, state: npt.ArrayLike) -> npt.ArrayLike:
         state = t.tensor(state, device=self._device).unsqueeze_(0)
         with t.no_grad():
-            action = self.actor(state)
+            action, _ = self.actor(state)
         return action.cpu().numpy()[0]
+
+    def exploit(self, state: npt.ArrayLike) -> npt.ArrayLike:
+        self.actor.eval()
+        action = self.explore(state)
+        self.actor.train()
+        return action

@@ -22,6 +22,14 @@ def save_json_config(config: str, path: str):
 
 class Logger(ABC):
 
+    def log_scalars(self, values: dict[str, float], step: int):
+        """
+        Args:
+            values: Dict with tag -> value to log.
+            step: Iter step.
+        """
+        (self.log_scalar(k, v, step) for k, v in values.items())
+
     @abstractmethod
     def log_scalar(self, tag: str, value: float, step: int):
         logging.info(f"{tag}\t{value}\tat step {step}")
