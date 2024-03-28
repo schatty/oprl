@@ -1,15 +1,14 @@
-import os
-from datetime import datetime
-import time
-from multiprocessing import Process
 import argparse
+import os
+import time
+from datetime import datetime
+from multiprocessing import Process
 
 import torch
 import torch.nn as nn
-
-from env import make_env, DMControlEnv
 from algos.ddpg import DDPG, DeterministicPolicy
 from distrib.distrib_runner import env_worker, policy_update_worker
+from env import DMControlEnv, make_env
 from trainers.buffers.episodic_buffer import EpisodicReplayBuffer
 from utils.logger import Logger
 
@@ -48,8 +47,8 @@ print("STATE ACTION SHAPE: ", STATE_SHAPE, ACTION_SHAPE)
 
 def make_policy():
     return DeterministicPolicy(
-        state_shape=STATE_SHAPE,
-        action_shape=ACTION_SHAPE,
+        state_dim=STATE_SHAPE,
+        action_dim=ACTION_SHAPE,
         hidden_units=[256, 256],
         hidden_activation=nn.ReLU(inplace=True),
     )
@@ -73,8 +72,8 @@ def make_algo():
     logger = Logger(log_dir, {})
 
     algo = DDPG(
-        state_shape=STATE_SHAPE,
-        action_shape=ACTION_SHAPE,
+        state_dim=STATE_SHAPE,
+        action_dim=ACTION_SHAPE,
         device="cpu",
         seed=0,
         logger=logger,

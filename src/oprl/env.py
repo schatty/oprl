@@ -96,7 +96,7 @@ class DMControlEnv:
                 obs_flatten.append(o.flatten())
             else:
                 obs_flatten.append(o)
-        return np.concatenate(obs_flatten)
+        return np.concatenate(obs_flatten, dtype="float32")
 
     @property
     def env_family(self) -> str:

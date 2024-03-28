@@ -1,14 +1,13 @@
+import argparse
 import os
 from datetime import datetime
-import argparse
 from multiprocessing import Process
-from copy import copy, deepcopy
 
-from trainers.base_trainer import BaseTrainer
 from algos.ddpg import DDPG
-from utils.logger import Logger
-from utils.config import load_config
 from env import DMControlEnv
+from trainers.base_trainer import BaseTrainer
+from utils.config import load_config
+from utils.logger import Logger
 
 
 def parse_args():
@@ -47,21 +46,21 @@ def run_training(config: str, env: str, device: str, seed: int):
     logger = Logger(log_dir, config.train.model_dump_json())
     print("LOGDIR: ", log_dir)
 
-    STATE_SHAPE = env.observation_space.shape
-    ACTION_SHAPE = env.action_space.shape
+    STATE_DIM: int = env.observation_space.shape[0]
+    ACTION_DIM: int = env.action_space.shape[0]
 
     trainer_class = BaseTrainer
     algo = DDPG(
-        state_shape=STATE_SHAPE,
-        action_shape=ACTION_SHAPE,
+        state_shape=STATE_DIM,
+        action_shape=ACTION_DIM,
         device=config.train.device,
         seed=config.train.seed,
         logger=logger,
     )
 
     trainer = trainer_class(
-        state_shape=STATE_SHAPE,
-        action_shape=ACTION_SHAPE,
+        state_dim=STATE_DIM,
+        action_dim=ACTION_DIM,
         env=env,
         make_env_test=make_test_env,
         algo=algo,

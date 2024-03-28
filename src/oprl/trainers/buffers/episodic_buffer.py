@@ -1,6 +1,6 @@
 import os
-
 import pickle
+
 import numpy as np
 import torch
 
@@ -8,19 +8,19 @@ import torch
 class EpisodicReplayBuffer:
     def __init__(
         self,
-        buffer_size,
-        state_shape,
-        action_shape,
-        device,
-        gamma,
-        max_episode_len=1000,
+        buffer_size: int,
+        state_dim: int,
+        action_dim: int,
+        device: str,
+        gamma: float,
+        max_episode_len: int = 1000,
         dtype=torch.float,
     ):
         """
         Args:
             buffer_size: Max number of transitions in buffer.
-            state_shape: Shape of the state.
-            action_shape: Shape of the action.
+            state_dim: Dimension of the state.
+            action_dim: Dimension of the action.
             device: Device to place buffer.
             gamma: Discount factor for N-step.
             max_episode_len: Max length of the episode to store.
@@ -29,8 +29,8 @@ class EpisodicReplayBuffer:
         self.buffer_size = buffer_size
         self.max_episodes = buffer_size // max_episode_len
         self.max_episode_len = max_episode_len
-        self.state_shape = state_shape
-        self.action_shape = action_shape
+        self.state_dim = state_dim
+        self.action_dim = action_dim
         self.device = device
         self.gamma = gamma
 
@@ -39,7 +39,7 @@ class EpisodicReplayBuffer:
         self.cur_size = 0
 
         self.actions = torch.empty(
-            (self.max_episodes, max_episode_len, *action_shape),
+            (self.max_episodes, max_episode_len, action_dim),
             dtype=dtype,
             device=device,
         )
@@ -50,14 +50,14 @@ class EpisodicReplayBuffer:
             (self.max_episodes, max_episode_len, 1), dtype=dtype, device=device
         )
         self.states = torch.empty(
-            (self.max_episodes, max_episode_len + 1, *state_shape),
+            (self.max_episodes, max_episode_len + 1, state_dim),
             dtype=dtype,
             device=device,
         )
         self.ep_lens = [0] * self.max_episodes
 
         self.actions_for_std = torch.empty(
-            (100, *action_shape), dtype=dtype, device=device
+            (100, action_dim), dtype=dtype, device=device
         )
         self.actions_for_std_cnt = 0
 
@@ -97,7 +97,7 @@ class EpisodicReplayBuffer:
         self.ep_lens[self.ep_pointer] = 0
 
     def add_episode(self, episode):
-        for (s, a, r, d, s_) in episode:
+        for s, a, r, d, s_ in episode:
             self.append(s, a, r, d, episode_done=d)
             if d:
                 break

@@ -2,6 +2,8 @@ import json
 import logging
 import os
 import shutil
+from abc import ABC, abstractmethod
+from typing import Any
 
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
@@ -14,28 +16,46 @@ def copy_exp_dir(log_dir: str):
     print(f"Source copied into {dest_dir}")
 
 
-def save_json_config(config: str, path: str):
+def save_json_config(config: dict[str, Any], path: str):
     with open(path, "w") as f:
         json.dump(config, f)
 
 
-class StdLogger:
-    def __init__(self, logdir: str | None = None, config: str | None = None):
+class Logger(ABC):
+
+    def log_scalars(self, values: dict[str, float], step: int):
+        """
+        Args:
+            values: Dict with tag -> value to log.
+            step: Iter step.
+        """
+        (self.log_scalar(k, v, step) for k, v in values.items())
+
+    @abstractmethod
+    def log_scalar(self, tag: str, value: float, step: int):
+        logging.info(f"{tag}\t{value}\tat step {step}")
+
+    @abstractmethod
+    def log_video(self, tag: str, imgs, step: int):
+        logging.warning("Skipping logging video in STDOUT logger")
+
+
+class StdLogger(Logger):
+    def __init__(self, *args, **kwargs):
         pass
 
     def log_scalar(self, tag: str, value: float, step: int):
         logging.info(f"{tag}\t{value}\tat step {step}")
 
-    def log_video(self, tag: str, imgs, step: int):
+    def log_video(self, *args, **kwargs):
         logging.warning("Skipping logging video in STDOUT logger")
 
 
-class Logger:
-    def __init__(self, logdir: str, config: str):
+class FileLogger(Logger):
+    def __init__(self, logdir: str, config: dict[str, Any]):
         self.writer = SummaryWriter(logdir)
 
         self._log_dir = logdir
-        # self._tags_to_log_file = ("reward",)
 
         logging.info(f"Source code is copied to {logdir}")
         copy_exp_dir(logdir)
@@ -43,19 +63,13 @@ class Logger:
 
     def log_scalar(self, tag: str, value: float, step: int):
         self.writer.add_scalar(tag, value, step)
-
-        # TODO: Check if it's ok to log everythin
-        # for tag_keyword in self._tags_to_log_file:
-        #     if tag_keyword in tag:
         self._log_scalar_to_file(tag, value, step)
 
     def log_video(self, tag: str, imgs, step: int):
-        # TODO: Log to TensorBoard
         os.makedirs(os.path.join(self._log_dir, "images"))
         fn = os.path.join(self._log_dir, "images", f"{tag}_step_{step}.npz")
         with open(fn, "wb") as f:
             np.save(f, imgs)
-        print("Video logged!")
 
     def _log_scalar_to_file(self, tag: str, val: float, step: int):
         fn = os.path.join(self._log_dir, f"{tag}.log")
