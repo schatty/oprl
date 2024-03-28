@@ -138,14 +138,12 @@ class DeterministicPolicy(nn.Module):
 
 
 class GaussianActor(nn.Module):
-    def __init__(self, state_dim, action_dim, hidden_units, hidden_activation, device):
+    def __init__(self, state_dim, action_dim, hidden_units, hidden_activation):
         super().__init__()
         self.action_dim = action_dim
         self.net = MLP(
             state_dim, 2 * action_dim, hidden_units, hidden_activation=hidden_activation
         )
-
-        self.device = device
 
     def forward(self, obs: t.Tensor) -> tuple[t.Tensor, t.Tensor | None]:
         mean, log_std = self.net(obs).split([self.action_dim, self.action_dim], dim=1)
@@ -161,6 +159,10 @@ class GaussianActor(nn.Module):
             action = t.tanh(mean)
             log_prob = None
         return action, log_prob
+
+    @property
+    def device(self):
+        return next(self.parameters()).device
 
 
 class TanhNormal(Distribution):

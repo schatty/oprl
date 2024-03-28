@@ -114,17 +114,16 @@ class SAC:
             action_dim=action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(inplace=True),
-            device=self._device,
-        )
+        ).to(device)
 
         self.critic = DoubleCritic(
             state_dim=self._state_dim,
             action_dim=self._action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(inplace=True),
-        ).to(self._device)
+        ).to(device)
 
-        self.critic_target = deepcopy(self.critic).to(self._device).eval()
+        self.critic_target = deepcopy(self.critic).to(device).eval()
         disable_gradient(self.critic_target)
 
         self.optim_actor = Adam(self.actor.parameters(), lr=lr_actor)

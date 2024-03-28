@@ -92,8 +92,7 @@ class TQC:
             action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(),
-            device=device,
-        )
+        ).to(device)
         self.critic = QuantileQritic(state_dim, action_dim, n_quantiles, n_nets).to(
             device
         )
