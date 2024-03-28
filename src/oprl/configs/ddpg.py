@@ -1,14 +1,10 @@
-import argparse
 import logging
-import os
-from copy import copy, deepcopy
-from datetime import datetime
 from multiprocessing import Process
 
 from oprl.algos.ddpg import DDPG
 from oprl.configs.utils import create_logdir, parse_args
 from oprl.env import make_env as _make_env
-from oprl.utils.logger import Logger
+from oprl.utils.logger import FileLogger, Logger
 from oprl.utils.run_training import run_training
 
 logging.basicConfig(level=logging.INFO)
@@ -22,15 +18,15 @@ def make_env(seed: int):
 
 
 env = make_env(seed=0)
-STATE_SHAPE = env.observation_space.shape
-ACTION_SHAPE = env.action_space.shape
+STATE_DIM: int = env.observation_space.shape[0]
+ACTION_DIM: int = env.action_space.shape[0]
 
 
 # --------  Config params -----------
 
 config = {
-    "state_shape": STATE_SHAPE,
-    "action_shape": ACTION_SHAPE,
+    "state_dim": STATE_DIM,
+    "action_dim": ACTION_DIM,
     "num_steps": int(1_000_000),
     "eval_every": 2500,
     "device": args.device,
@@ -45,18 +41,19 @@ config = {
 
 def make_algo(logger, seed):
     return DDPG(
-        state_dim=STATE_SHAPE,
-        action_dim=ACTION_SHAPE,
+        state_dim=STATE_DIM,
+        action_dim=ACTION_DIM,
         device=args.device,
         seed=seed,
         logger=logger,
     )
 
 
-def make_logger(seed: int):
+def make_logger(seed: int) -> Logger:
+    global config
     log_dir = create_logdir(logdir="logs", algo="DDPG", env=args.env, seed=seed)
     # TODO: add config here instead {}
-    return Logger(log_dir, {})
+    return FileLogger(log_dir, config)
 
 
 if __name__ == "__main__":
@@ -76,9 +73,9 @@ if __name__ == "__main__":
 
         for i, p in enumerate(processes):
             p.start()
-            print(f"Starting process {i}...")
+            logging.info(f"Starting process {i}...")
 
         for p in processes:
             p.join()
 
-    print("OK.")
+    logging.info("OK.")

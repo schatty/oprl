@@ -1,5 +1,5 @@
-import sys
 import importlib.util
+import sys
 
 
 def load_config(path: str):
@@ -7,4 +7,5 @@ def load_config(path: str):
     config = importlib.util.module_from_spec(spec)
     sys.modules["config"] = config
     spec.loader.exec_module(config)
+    print("Returned type: ", type(config))
     return config

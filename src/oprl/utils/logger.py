@@ -3,6 +3,7 @@ import logging
 import os
 import shutil
 from abc import ABC, abstractmethod
+from typing import Any
 
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
@@ -15,7 +16,7 @@ def copy_exp_dir(log_dir: str):
     print(f"Source copied into {dest_dir}")
 
 
-def save_json_config(config: str, path: str):
+def save_json_config(config: dict[str, Any], path: str):
     with open(path, "w") as f:
         json.dump(config, f)
 
@@ -51,7 +52,7 @@ class StdLogger(Logger):
 
 
 class FileLogger(Logger):
-    def __init__(self, logdir: str, config: str):
+    def __init__(self, logdir: str, config: dict[str, Any]):
         self.writer = SummaryWriter(logdir)
 
         self._log_dir = logdir
