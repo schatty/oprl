@@ -15,7 +15,7 @@ def run_training(
         for seed in range(start_seed, start_seed + seeds):
             processes.append(
                 Process(
-                    target=run_training,
+                    target=_run_training_func,
                     args=(make_algo, make_env, make_logger, config, seed),
                 )
             )
