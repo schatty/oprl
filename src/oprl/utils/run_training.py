@@ -14,8 +14,8 @@ def run_training(make_algo, make_env, make_logger, config, seed):
         raise ValueError(f"Unsupported env family: {env.env_family}")
 
     trainer = trainer_class(
-        state_shape=config["state_shape"],
-        action_shape=config["action_shape"],
+        state_dim=config["state_dim"],
+        action_dim=config["action_dim"],
         env=env,
         make_env_test=make_env,
         algo=make_algo(logger, seed),

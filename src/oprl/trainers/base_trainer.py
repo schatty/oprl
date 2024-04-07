@@ -7,8 +7,8 @@ from oprl.trainers.buffers.episodic_buffer import EpisodicReplayBuffer
 class BaseTrainer:
     def __init__(
         self,
-        state_shape=None,
-        action_shape=None,
+        state_dim=None,
+        action_dim=None,
         env=None,
         make_env_test=None,
         algo=None,
@@ -29,8 +29,8 @@ class BaseTrainer:
     ):
         """
         Args:
-            state_shape: Shape of the state.
-            action_shape: Shape of the action.
+            state_dim: Dimension of the observation.
+            action_dim: Dimension of the action.
             env: Enviornment object.
             make_env_test: Environment object for evaluation.
             algo: Codename for the algo (SAC).
@@ -60,8 +60,8 @@ class BaseTrainer:
 
         self.buffer = EpisodicReplayBuffer(
             buffer_size=buffer_size,
-            state_shape=state_shape,
-            action_shape=action_shape,
+            state_dim=state_dim,
+            action_dim=action_dim,
             device=device,
             gamma=gamma,
         )
@@ -94,8 +94,9 @@ class BaseTrainer:
 
             if len(self.buffer) < self.batch_size:
                 continue
+
             batch = self.buffer.sample(self.batch_size)
-            self.algo.update(batch)
+            self.algo.update(*batch)
 
             self._eval_routine(env_step, batch)
             self._visualize(env_step)
@@ -237,8 +238,8 @@ def run_training(make_algo, make_env, make_logger, config, seed):
     logger = make_logger(seed)
 
     trainer = BaseTrainer(
-        state_shape=config["state_shape"],
-        action_shape=config["action_shape"],
+        state_dim=config["state_shape"],
+        action_dim=config["action_shape"],
         env=env,
         make_env_test=make_env,
         algo=make_algo(logger, seed),

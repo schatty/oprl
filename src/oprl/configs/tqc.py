@@ -1,14 +1,10 @@
-import argparse
 import logging
-import os
-from copy import copy, deepcopy
-from datetime import datetime
 from multiprocessing import Process
 
 from oprl.algos.tqc import TQC
 from oprl.configs.utils import create_logdir, parse_args
 from oprl.env import make_env as _make_env
-from oprl.utils.logger import Logger
+from oprl.utils.logger import FileLogger, Logger
 from oprl.utils.run_training import run_training
 
 logging.basicConfig(level=logging.INFO)
@@ -21,16 +17,16 @@ def make_env(seed: int):
 
 
 env = make_env(seed=0)
-STATE_SHAPE = env.observation_space.shape
-ACTION_SHAPE = env.action_space.shape
+STATE_DIM: int = env.observation_space.shape[0]
+ACTION_DIM: int = env.action_space.shape[0]
 
 
 # --------  Config params -----------
 
 config = {
-    "state_shape": STATE_SHAPE,
-    "action_shape": ACTION_SHAPE,
-    "num_steps": int(1_000_000),
+    "state_dim": STATE_DIM,
+    "action_dim": ACTION_DIM,
+    "num_steps": int(10_000),  # int(1_000_000),
     "eval_every": 2500,
     "device": args.device,
     "save_buffer": False,
@@ -44,8 +40,8 @@ config = {
 
 def make_algo(logger, seed):
     return TQC(
-        state_shape=STATE_SHAPE,
-        action_shape=ACTION_SHAPE,
+        state_dim=STATE_DIM,
+        action_dim=ACTION_DIM,
         device=args.device,
         seed=seed,
         logger=logger,
@@ -55,7 +51,7 @@ def make_algo(logger, seed):
 def make_logger(seed: int):
     log_dir = create_logdir(logdir="logs", algo="TQC", env=args.env, seed=seed)
     # TODO: add config here instead {}
-    return Logger(log_dir, {})
+    return FileLogger(log_dir, {})
 
 
 if __name__ == "__main__":
