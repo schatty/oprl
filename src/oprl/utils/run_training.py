@@ -1,8 +1,36 @@
+import logging
+from multiprocessing import Process
+
 from oprl.trainers.base_trainer import BaseTrainer
 from oprl.trainers.safe_trainer import SafeTrainer
 
 
-def run_training(make_algo, make_env, make_logger, config, seed):
+def run_training(
+    make_algo, make_env, make_logger, config, seeds: int = 1, start_seed: int = 0
+):
+    if seeds == 1:
+        _run_training_func(make_algo, make_env, make_logger, config, 0)
+    else:
+        processes = []
+        for seed in range(start_seed, start_seed + seeds):
+            processes.append(
+                Process(
+                    target=run_training,
+                    args=(make_algo, make_env, make_logger, config, seed),
+                )
+            )
+
+        for i, p in enumerate(processes):
+            p.start()
+            logging.info(f"Starting process {i}...")
+
+        for p in processes:
+            p.join()
+
+        logging.info("Training OK.")
+
+
+def _run_training_func(make_algo, make_env, make_logger, config, seed):
     env = make_env(seed=seed)
     logger = make_logger(seed)
 

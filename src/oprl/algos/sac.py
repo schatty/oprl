@@ -1,80 +1,14 @@
-import math
 from copy import deepcopy
 
 import numpy as np
 import numpy.typing as npt
 import torch as t
-import torch.nn.functional as F
 from torch import nn
 from torch.optim import Adam
 
-from oprl.algos.nn import MLP, DoubleCritic, GaussianActor
-from oprl.algos.utils import Clamp, disable_gradient, initialize_weight, soft_update
+from oprl.algos.nn import DoubleCritic, GaussianActor
+from oprl.algos.utils import disable_gradient, soft_update
 from oprl.utils.logger import Logger, StdLogger
-
-"""
-def calculate_gaussian_log_prob(log_stds: t.Tensor, noises: t.Tensor) -> t.Tensor:
-    # NOTE: We only use multivariate gaussian distribution with diagonal
-    # covariance matrix,  which can be viewed as simultaneous distribution of
-    # gaussian distributions, p_i(u). So, log_probs = \sum_i log p_i(u).
-    return (-0.5 * noises.pow(2) - log_stds).sum(dim=-1, keepdim=True) - 0.5 * math.log(
-        2 * math.pi
-    ) * log_stds.size(-1)
-
-
-def calculate_log_pi(log_stds: t.Tensor, noises: t.Tensor, us: t.Tensor) -> t.Tensor:
-    # NOTE: Because we calculate actions = tanh(us), we need to correct
-    # log_probs. Because tanh(u)' = 1 - tanh(u)**2, we need to substract
-    # \sum_i log(1 - tanh(u)**2) from gaussian_log_probs. For numerical
-    # stabilities, we use the deformation as below.
-    # log(1 - tanh(u)**2)
-    # = 2 * log(2 / (exp(u) + exp(-u)))
-    # = 2 * (log(2) - log(exp(u) * (1 + exp(-2*u))))
-    # = 2 * (log(2) - u - softplus(-2*u))
-    return calculate_gaussian_log_prob(log_stds, noises) - (
-        2 * (math.log(2) - us - F.softplus(-2 * us))
-    ).sum(dim=-1, keepdim=True)
-
-
-def reparameterize(means: t.Tensor, log_stds: t.Tensor) -> tuple[t.Tensor, t.Tensor]:
-    stds = log_stds.exp()
-    noises = t.randn_like(means)
-    x = means + noises * stds
-    actions = t.tanh(x)
-    return actions, calculate_log_pi(log_stds, noises, x)
-
-
-class GaussianPolicy(nn.Module):
-    def __init__(
-        self,
-        state_dim: int,
-        action_dim: int,
-        hidden_units: tuple[int, ...] = (256, 256),
-        hidden_activation: t.nn.Module = nn.ReLU(inplace=True),
-    ):
-        super().__init__()
-
-        self.mlp = MLP(
-            input_dim=state_dim,
-            output_dim=hidden_units[-1],
-            hidden_units=hidden_units[:-1],
-            hidden_activation=hidden_activation,
-            output_activation=hidden_activation,
-        )
-
-        self.mean = nn.Linear(hidden_units[-1], action_dim).apply(initialize_weight)
-
-        self.log_std = nn.Sequential(
-            nn.Linear(hidden_units[-1], action_dim), Clamp()
-        ).apply(initialize_weight)
-
-    def forward(self, states: t.Tensor) -> t.Tensor:
-        return t.tanh(self.mean(self.mlp(states)))
-
-    def sample(self, states: t.Tensor) -> tuple[t.Tensor, t.Tensor]:
-        x = self.mlp(states)
-        return reparameterize(self.mean(x), self.log_std(x))
-"""
 
 
 class SAC:

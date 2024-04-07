@@ -103,6 +103,7 @@ class DeterministicPolicy(nn.Module):
         hidden_units: tuple[int, ...] = (256, 256),
         hidden_activation=nn.ReLU(inplace=True),
         max_action: float = 1.0,
+        expl_noise: float = 0.1,
         device: str = "cpu",
     ):
         super().__init__()
@@ -117,6 +118,7 @@ class DeterministicPolicy(nn.Module):
         self._device = device
         self._action_shape = action_dim
         self._max_action = max_action
+        self._expl_noise = expl_noise
 
     def forward(self, states: t.Tensor) -> t.Tensor:
         return t.tanh(self.mlp(states))
@@ -128,9 +130,8 @@ class DeterministicPolicy(nn.Module):
     def explore(self, state: npt.ArrayLike) -> npt.NDArray:
         state = t.tensor(state, device=self._device).unsqueeze_(0)
 
-        # TODO: Set exploration noise of 0.1 as the property of the agent
         with t.no_grad():
-            noise = (t.randn(self._action_shape) * 0.1).to(self._device)
+            noise = (t.randn(self._action_shape) * self._expl_noise).to(self._device)
             action = self.mlp(state) + noise
 
         a = action.cpu().numpy()[0]
@@ -166,7 +167,7 @@ class GaussianActor(nn.Module):
 
 
 class TanhNormal(Distribution):
-    def __init__(self, normal_mean, normal_std, device):
+    def __init__(self, normal_mean: t.Tensor, normal_std: t.Tensor, device: str):
         super().__init__()
         self.normal_mean = normal_mean
         self.normal_std = normal_std

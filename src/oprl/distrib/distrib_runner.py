@@ -1,11 +1,11 @@
 import pickle
 import time
-from multiprocessing import Process
-import pika
 from itertools import count
+from multiprocessing import Process
 
-import torch
 import numpy as np
+import pika
+import torch
 
 
 class Queue:
