@@ -3,6 +3,7 @@ from multiprocessing import Process
 
 from oprl.trainers.base_trainer import BaseTrainer
 from oprl.trainers.safe_trainer import SafeTrainer
+from oprl.utils.utils import set_seed
 
 
 def run_training(
@@ -30,7 +31,8 @@ def run_training(
         logging.info("Training OK.")
 
 
-def _run_training_func(make_algo, make_env, make_logger, config, seed):
+def _run_training_func(make_algo, make_env, make_logger, config, seed: int):
+    set_seed(seed)
     env = make_env(seed=seed)
     logger = make_logger(seed)
 
@@ -46,7 +48,7 @@ def _run_training_func(make_algo, make_env, make_logger, config, seed):
         action_dim=config["action_dim"],
         env=env,
         make_env_test=make_env,
-        algo=make_algo(logger, seed),
+        algo=make_algo(logger),
         num_steps=config["num_steps"],
         eval_interval=config["eval_every"],
         device=config["device"],

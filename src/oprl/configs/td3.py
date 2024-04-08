@@ -2,11 +2,12 @@ import logging
 
 from oprl.algos.td3 import TD3
 from oprl.configs.utils import create_logdir, parse_args
+from oprl.utils.utils import set_logging
+
+set_logging(logging.INFO)
 from oprl.env import make_env as _make_env
 from oprl.utils.logger import FileLogger, Logger
 from oprl.utils.run_training import run_training
-
-logging.basicConfig(level=logging.INFO)
 
 args = parse_args()
 
@@ -37,12 +38,11 @@ config = {
 # -----------------------------------
 
 
-def make_algo(logger, seed):
+def make_algo(logger):
     return TD3(
         state_dim=STATE_DIM,
         action_dim=ACTION_DIM,
         device=args.device,
-        seed=seed,
         logger=logger,
     )
 

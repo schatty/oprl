@@ -6,7 +6,7 @@ import torch as t
 import torch.nn as nn
 
 from oprl.algos.nn import MLP, GaussianActor
-from oprl.utils.logger import StdLogger
+from oprl.utils.logger import Logger, StdLogger
 
 
 def quantile_huber_loss_f(
@@ -72,12 +72,8 @@ class TQC:
         n_nets: int = 5,
         log_every: int = 5000,
         device: str = "cpu",
-        seed: int = 0,
-        logger=StdLogger(),
+        logger: Logger = StdLogger(),
     ):
-        np.random.seed(seed)
-        t.manual_seed(seed)
-
         self._discount = discount
         self._tau = tau
         self._top_quantiles_to_drop = top_quantiles_to_drop

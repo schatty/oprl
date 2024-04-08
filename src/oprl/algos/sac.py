@@ -25,13 +25,9 @@ class SAC:
         alpha_init: float = 0.2,
         target_update_coef: float = 5e-3,
         device: str = "cpu",
-        seed: int = 0,
         log_every: int = 5000,
         logger: Logger = StdLogger(),
     ):
-        np.random.seed(seed)
-        t.manual_seed(seed)
-
         self._update_step = 0
         self._state_dim = state_dim
         self._action_dim = action_dim

@@ -1,9 +1,13 @@
-import numpy as np
-import imageio
-from glob import glob
+import logging
 import os
+import random
 import shutil
-from multiprocessing import Queue
+import sys
+from glob import glob
+
+import imageio
+import numpy as np
+import torch as t
 
 
 class OUNoise(object):
@@ -73,8 +77,22 @@ def empty_torch_queue(q):
     q.close()
 
 
-def copy_exp_dir(log_dir: str):
+def copy_exp_dir(log_dir: str) -> None:
     cur_dir = os.path.join(os.getcwd(), "src")
     dest_dir = os.path.join(log_dir, "src")
     shutil.copy(cur_dir, dest_dir)
-    print(f"Source copied into {dest_dir}")
+    logging.info(f"Source copied into {dest_dir}")
+
+
+def set_seed(seed: int) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    t.manual_seed(seed)
+
+
+def set_logging(level: int):
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s | %(filename)s:%(lineno)d\t %(levelname)s - %(message)s",
+        stream=sys.stdout,
+    )
