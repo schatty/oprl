@@ -22,13 +22,8 @@ class DDPG:
         tau: float = 5e-3,
         batch_size: int = 256,
         device: str = "cpu",
-        seed: int = 0,
         logger: Logger = StdLogger(),
     ):
-        # TODO: move seed setting into the entrypoint
-        np.random.seed(seed)
-        t.manual_seed(seed)
-
         self._expl_noise = expl_noise
         self._action_dim = action_dim
         self._discount = discount
@@ -125,3 +120,7 @@ class DDPG:
 
     def get_policy_state_dict(self) -> Dict[str, Any]:
         return self.actor.state_dict()
+
+    @property
+    def logger(self) -> Logger:
+        return self._logger

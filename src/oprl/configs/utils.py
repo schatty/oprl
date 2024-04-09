@@ -1,10 +1,10 @@
 import argparse
+import logging
 import os
 from datetime import datetime
-import logging
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run training")
     parser.add_argument("--config", type=str, help="Path to the config file.")
     parser.add_argument(
@@ -28,7 +28,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def create_logdir(logdir: str, algo: str, env: str, seed: int):
+def create_logdir(logdir: str, algo: str, env: str, seed: int) -> str:
     dt = datetime.now().strftime("%Y_%m_%d_%Hh%Mm")
     log_dir = os.path.join(logdir, algo, f"{algo}-env_{env}-seed_{seed}-{dt}")
     logging.info(f"LOGDIR: {log_dir}")

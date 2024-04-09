@@ -6,14 +6,14 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import numpy as np
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard.writer import SummaryWriter
 
 
-def copy_exp_dir(log_dir: str):
+def copy_exp_dir(log_dir: str) -> None:
     cur_dir = os.path.join(os.getcwd(), "src")
     dest_dir = os.path.join(log_dir, "src")
     shutil.copytree(cur_dir, dest_dir)
-    print(f"Source copied into {dest_dir}")
+    logging.info(f"Source copied into {dest_dir}")
 
 
 def save_json_config(config: dict[str, Any], path: str):
@@ -61,17 +61,17 @@ class FileLogger(Logger):
         copy_exp_dir(logdir)
         save_json_config(config, os.path.join(logdir, "config.json"))
 
-    def log_scalar(self, tag: str, value: float, step: int):
+    def log_scalar(self, tag: str, value: float, step: int) -> None:
         self.writer.add_scalar(tag, value, step)
         self._log_scalar_to_file(tag, value, step)
 
-    def log_video(self, tag: str, imgs, step: int):
+    def log_video(self, tag: str, imgs, step: int) -> None:
         os.makedirs(os.path.join(self._log_dir, "images"))
         fn = os.path.join(self._log_dir, "images", f"{tag}_step_{step}.npz")
         with open(fn, "wb") as f:
             np.save(f, imgs)
 
-    def _log_scalar_to_file(self, tag: str, val: float, step: int):
+    def _log_scalar_to_file(self, tag: str, val: float, step: int) -> None:
         fn = os.path.join(self._log_dir, f"{tag}.log")
         os.makedirs(os.path.dirname(fn), exist_ok=True)
         with open(fn, "a") as f:

@@ -28,12 +28,8 @@ class TD3:
         tau: float = 5e-3,
         log_every: int = 5000,
         device="cpu",
-        seed: int = 0,
         logger: Logger = StdLogger(),
     ):
-        np.random.seed(seed)
-        t.manual_seed(seed)
-
         self._aciton_dim = action_dim
         self._expl_noise = expl_noise
         self._batch_size = batch_size
