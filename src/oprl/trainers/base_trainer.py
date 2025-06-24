@@ -187,7 +187,7 @@ class BaseTrainer:
                 action = self._algo.exploit(state)
                 state, _, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
-            return np.concatenate(imgs)
+            return np.concatenate(imgs, dtype="uint8")
         except Exception as e:
             print(f"Failed to visualise a policy: {e}")
             return None

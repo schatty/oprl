@@ -66,7 +66,7 @@ class FileLogger(Logger):
         self._log_scalar_to_file(tag, value, step)
 
     def log_video(self, tag: str, imgs, step: int) -> None:
-        os.makedirs(os.path.join(self._log_dir, "images"))
+        os.makedirs(os.path.join(self._log_dir, "images"), exist_ok=True)
         fn = os.path.join(self._log_dir, "images", f"{tag}_step_{step}.npz")
         with open(fn, "wb") as f:
             np.save(f, imgs)
