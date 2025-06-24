@@ -1,5 +1,5 @@
 pytest==8.0.1
-torch==2.1.2
+torch==2.2.0
 tensorboard==2.15.1
 packaging==23.2
 dm-control==1.0.16
