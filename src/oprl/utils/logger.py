@@ -3,9 +3,12 @@ import logging
 import os
 import shutil
 from abc import ABC, abstractmethod
+from sys import path
 from typing import Any
 
 import numpy as np
+import torch
+import torch.nn as nn
 from torch.utils.tensorboard.writer import SummaryWriter
 
 
@@ -70,6 +73,14 @@ class FileLogger(Logger):
         fn = os.path.join(self._log_dir, "images", f"{tag}_step_{step}.npz")
         with open(fn, "wb") as f:
             np.save(f, imgs)
+
+    def save_weights(self, weights: nn.Module, step: int) -> None:
+        os.makedirs(os.path.join(self._log_dir, "weights"), exist_ok=True)
+        fn = os.path.join(self._log_dir, "weights", f"step_{step}.w")
+        torch.save(
+            weights,
+            fn
+        )
 
     def _log_scalar_to_file(self, tag: str, val: float, step: int) -> None:
         fn = os.path.join(self._log_dir, f"{tag}.log")
