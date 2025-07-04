@@ -19,3 +19,16 @@ jobs:
     - name: Unit Tests
       run: docker run --rm oprl
 
+    - name: Extract coverage
+      run: |
+        docker run --rm -v $(pwd):/host oprl sh -c "
+          pytest --cov=oprl --cov-report=xml &&
+          cp coverage.xml /host/
+        "
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        slug: schatty/oprl
+        file: ./coverage.xml
