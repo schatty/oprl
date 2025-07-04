@@ -1,4 +1,4 @@
-name: Tests
+name: Unit Tests
 on: 
   push:
     branches: [ "master", "develop"]
@@ -6,7 +6,8 @@ on:
     branches: [ "master", "develop"]
 
 jobs:
-  Unit Tests:
+  unit_tests:
+    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
