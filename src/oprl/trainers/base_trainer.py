@@ -1,3 +1,4 @@
+import os
 from typing import Any, Callable
 
 import numpy as np
@@ -24,6 +25,7 @@ class BaseTrainer:
         eval_interval: int = int(2e3),
         num_eval_episodes: int = 10,
         save_buffer_every: int = 0,
+        save_policy_every: int = int(50_000),
         visualise_every: int = 0,
         estimate_q_every: int = 0,
         stdout_log_every: int = int(1e5),
@@ -60,6 +62,7 @@ class BaseTrainer:
         self._visualize_every = visualise_every
         self._estimate_q_every = estimate_q_every
         self._stdout_log_every = stdout_log_every
+        self._save_policy_every=  save_policy_every
         self._logger = logger
         self.seed = seed
 
@@ -106,6 +109,7 @@ class BaseTrainer:
             self._eval_routine(env_step, batch)
             self._visualize(env_step)
             self._save_buffer(env_step)
+            self._save_policy(env_step)
             self._log_stdout(env_step, batch)
 
     def _eval_routine(self, env_step: int, batch):
@@ -151,8 +155,13 @@ class BaseTrainer:
                 self._logger.log_video("eval_policy", imgs, env_step)
 
     def _save_buffer(self, env_step: int):
+        # TODO: doesn't work
         if self._save_buffer_every > 0 and env_step % self._save_buffer_every == 0:
             self.buffer.save(f"{self.log_dir}/buffers/buffer_step_{env_step}.pickle")
+
+    def _save_policy(self, env_step: int):
+        if self._save_policy_every > 0 and env_step % self._save_policy_every == 0:
+            self._logger.save_weights(self._algo.actor, env_step)
 
     def _estimate_q(self, env_step: int):
         if self._estimate_q_every > 0 and env_step % self._estimate_q_every == 0:
@@ -187,7 +196,7 @@ class BaseTrainer:
                 action = self._algo.exploit(state)
                 state, _, terminated, truncated, _ = env.step(action)
                 done = terminated or truncated
-            return np.concatenate(imgs)
+            return np.concatenate(imgs, dtype="uint8")
         except Exception as e:
             print(f"Failed to visualise a policy: {e}")
             return None

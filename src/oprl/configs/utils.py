@@ -29,7 +29,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def create_logdir(logdir: str, algo: str, env: str, seed: int) -> str:
-    dt = datetime.now().strftime("%Y_%m_%d_%Hh%Mm")
+    dt = datetime.now().strftime("%Y_%m_%d_%Hh%Mm%Ss")
     log_dir = os.path.join(logdir, algo, f"{algo}-env_{env}-seed_{seed}-{dt}")
     logging.info(f"LOGDIR: {log_dir}")
     return log_dir

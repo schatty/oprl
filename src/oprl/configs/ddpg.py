@@ -26,11 +26,11 @@ ACTION_DIM: int = env.action_space.shape[0]
 config = {
     "state_dim": STATE_DIM,
     "action_dim": ACTION_DIM,
-    "num_steps": int(1_000_000),
+    "num_steps": int(100_000),
     "eval_every": 2500,
     "device": args.device,
     "save_buffer": False,
-    "visualise_every": 0,
+    "visualise_every": 50000,
     "estimate_q_every": 5000,
     "log_every": 2500,
 }
@@ -48,7 +48,6 @@ def make_algo(logger):
 
 
 def make_logger(seed: int) -> Logger:
-    global config
     log_dir = create_logdir(logdir="logs", algo="DDPG", env=args.env, seed=seed)
     return FileLogger(log_dir, config)
 

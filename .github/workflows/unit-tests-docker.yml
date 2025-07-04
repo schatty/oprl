@@ -1,0 +1,34 @@
+name: Unit Tests
+on: 
+  push:
+    branches: [ "master", "develop"]
+  pull_request:
+    branches: [ "master", "develop"]
+
+jobs:
+  unit_tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Build Docker image
+      run: docker build -t oprl .
+    
+    - name: Unit Tests
+      run: docker run --rm oprl
+
+    - name: Extract coverage
+      run: |
+        docker run --rm -v $(pwd):/host oprl sh -c "
+          pytest --cov=oprl --cov-report=xml &&
+          cp coverage.xml /host/
+        "
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        slug: schatty/oprl
+        file: ./coverage.xml

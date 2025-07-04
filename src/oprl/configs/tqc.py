@@ -48,7 +48,6 @@ def make_algo(logger: Logger):
 
 
 def make_logger(seed: int) -> Logger:
-    global config
     log_dir = create_logdir(logdir="logs", algo="TQC", env=args.env, seed=seed)
     return FileLogger(log_dir, config)
 

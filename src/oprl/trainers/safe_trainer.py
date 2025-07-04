@@ -23,6 +23,7 @@ class SafeTrainer(BaseTrainer):
         eval_interval: int = int(2e3),
         num_eval_episodes: int = 10,
         save_buffer_every: int = 0,
+        save_policy_every: int = int(50_000),
         visualise_every: int = 0,
         estimate_q_every: int = 0,
         stdout_log_every: int = int(1e5),
@@ -65,6 +66,7 @@ class SafeTrainer(BaseTrainer):
             eval_interval=eval_interval,
             num_eval_episodes=num_eval_episodes,
             save_buffer_every=save_buffer_every,
+            save_policy_every=save_policy_every,
             visualise_every=visualise_every,
             estimate_q_every=estimate_q_every,
             stdout_log_every=stdout_log_every,
@@ -97,10 +99,11 @@ class SafeTrainer(BaseTrainer):
             if len(self.buffer) < self.batch_size:
                 continue
             batch = self.buffer.sample(self.batch_size)
-            self._algo.update(batch)
+            self._algo.update(*batch)
 
             self._eval_routine(env_step, batch)
             self._visualize(env_step)
+            self._save_policy(env_step)
             self._save_buffer(env_step)
             self._log_stdout(env_step, batch)
 

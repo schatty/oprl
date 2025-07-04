@@ -1,8 +1,9 @@
 import pytest
 
-from oprl.env import DMControlEnv
+from oprl.env import make_env
 
-dm_control_envs = [
+
+dm_control_envs: list[str] = [
     "acrobot-swingup",
     "ball_in_cup-catch",
     "cartpole-balance",
@@ -30,9 +31,20 @@ dm_control_envs = [
 ]
 
 
-@pytest.mark.parametrize("env_name", dm_control_envs)
-def test_dm_control_envs(env_name: str):
-    env = DMControlEnv(env_name, seed=0)
+safety_envs: list[str] = [
+    "SafetyPointGoal1-v0",
+    "SafetyPointButton1-v0",
+    "SafetyPointPush1-v0",
+    "SafetyPointCircle1-v0",
+]
+
+
+env_names: list[str] = dm_control_envs # + safety_envs
+
+
+@pytest.mark.parametrize("env_name", env_names)
+def test_envs(env_name: str) -> None:
+    env = make_env(env_name, seed=0)
     obs, info = env.reset()
     assert obs.shape[0] == env.observation_space.shape[0]
     assert isinstance(info, dict), "Info is expected to be a dict"

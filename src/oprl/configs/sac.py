@@ -50,7 +50,6 @@ def make_algo(logger):
 
 
 def make_logger(seed: int) -> Logger:
-    global config
     log_dir = create_logdir(logdir="logs", algo="SAC", env=args.env, seed=seed)
     return FileLogger(log_dir, config)
 
