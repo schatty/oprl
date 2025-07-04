@@ -18,7 +18,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
 ]
 dependencies = [
-    "torch==2.2.2",
+    "torch==2.7.1",
     "tensorboard==2.15.1",
     "packaging==23.2",
     "dm-control==1.0.11",
