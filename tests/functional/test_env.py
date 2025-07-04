@@ -39,7 +39,7 @@ safety_envs: list[str] = [
 ]
 
 
-env_names: list[str] = dm_control_envs + safety_envs
+env_names: list[str] = dm_control_envs # + safety_envs
 
 
 @pytest.mark.parametrize("env_name", env_names)

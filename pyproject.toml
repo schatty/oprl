@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oprl"
+version = "0.1.0"
+description = "An RL Lib"
+readme = "README.md"
+requires-python = "==3.10.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Igor Kuznetsov"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.10",
+]
+dependencies = [
+    "torch==2.2.2",
+    "tensorboard==2.15.1",
+    "packaging==23.2",
+    "dm-control==1.0.11",
+    "mujoco==2.3.3",
+    "numpy==1.26.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "black",
+    "flake8",
+]
+
+[project.urls]
+"Homepage" = "https://schatty.github.io/oprl"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["oprl*"]
+
+[tool.setuptools.package-dir]
+"" = "src"
