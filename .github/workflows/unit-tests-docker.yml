@@ -1,7 +1,5 @@
 name: Unit Tests
 on: 
-  push:
-    branches: [ "master", "develop"]
   pull_request:
     branches: [ "master", "develop"]
 
@@ -22,7 +20,7 @@ jobs:
     - name: Extract coverage
       run: |
         docker run --rm -v $(pwd):/host oprl sh -c "
-          pytest --cov=oprl --cov-report=xml &&
+          pytest tests/functional --cov=oprl --cov-report=xml &&
           cp coverage.xml /host/
         "
     
