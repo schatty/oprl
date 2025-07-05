@@ -24,11 +24,9 @@ def run_training(
         for i, p in enumerate(processes):
             p.start()
             logging.info(f"Starting process {i}...")
-
         for p in processes:
             p.join()
-
-        logging.info("Training OK.")
+        logging.info("Training finished.")
 
 
 def _run_training_func(make_algo, make_env, make_logger, config, seed: int):
@@ -52,8 +50,6 @@ def _run_training_func(make_algo, make_env, make_logger, config, seed: int):
         num_steps=config["num_steps"],
         eval_interval=config["eval_every"],
         device=config["device"],
-        save_buffer_every=config["save_buffer"],
-        visualise_every=config["visualise_every"],
         estimate_q_every=config["estimate_q_every"],
         stdout_log_every=config["log_every"],
         seed=seed,

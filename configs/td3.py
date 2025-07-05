@@ -1,15 +1,15 @@
-import logging
-
-from oprl.algos.sac import SAC
-from oprl.configs.utils import create_logdir, parse_args
-from oprl.utils.utils import set_logging
-
-set_logging(logging.INFO)
+from oprl.algos import OffPolicyAlgorithm
+from oprl.algos.td3 import TD3
+from oprl.parse_args import parse_args
+from oprl.logging import (
+    create_logdir,
+    set_logging,
+    FileTxtLogger,
+    LoggerProtocol
+)
+set_logging()
 from oprl.env import make_env as _make_env
-from oprl.utils.logger import FileLogger, Logger
 from oprl.utils.run_training import run_training
-
-logging.basicConfig(level=logging.INFO)
 
 args = parse_args()
 
@@ -28,30 +28,30 @@ ACTION_DIM: int = env.action_space.shape[0]
 config = {
     "state_dim": STATE_DIM,
     "action_dim": ACTION_DIM,
-    "num_steps": int(1_000_000),
+    "num_steps": int(100_000),
     "eval_every": 2500,
     "device": args.device,
-    "save_buffer": False,
-    "visualise_every": 0,
     "estimate_q_every": 5000,
-    "log_every": 1000,
+    "log_every": 2500,
 }
 
 # -----------------------------------
 
 
-def make_algo(logger):
-    return SAC(
+def make_algo(logger: LoggerProtocol) -> OffPolicyAlgorithm:
+    return TD3(
         state_dim=STATE_DIM,
         action_dim=ACTION_DIM,
         device=args.device,
         logger=logger,
-    )
+    ).create()
 
 
-def make_logger(seed: int) -> Logger:
-    log_dir = create_logdir(logdir="logs", algo="SAC", env=args.env, seed=seed)
-    return FileLogger(log_dir, config)
+def make_logger(seed: int) -> LoggerProtocol:
+    log_dir = create_logdir(logdir="logs", algo="TD3", env=args.env, seed=seed)
+    logger = FileTxtLogger(log_dir, config)
+    logger.copy_source_code()
+    return logger
 
 
 if __name__ == "__main__":

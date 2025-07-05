@@ -1,4 +1,3 @@
-import os
 from typing import Any, Callable
 
 import numpy as np
@@ -6,7 +5,7 @@ import torch
 
 from oprl.env import BaseEnv
 from oprl.trainers.buffers.episodic_buffer import EpisodicReplayBuffer
-from oprl.utils.logger import Logger, StdLogger
+from oprl.logging import LoggerProtocol
 
 
 class BaseTrainer:
@@ -25,13 +24,12 @@ class BaseTrainer:
         eval_interval: int = int(2e3),
         num_eval_episodes: int = 10,
         save_buffer_every: int = 0,
-        save_policy_every: int = int(50_000),
-        visualise_every: int = 0,
+        save_policy_every: int = int(100_000),
         estimate_q_every: int = 0,
         stdout_log_every: int = int(1e5),
         device: str = "cpu",
         seed: int = 0,
-        logger: Logger = StdLogger(),
+        logger: LoggerProtocol | None = None,
     ):
         """
         Args:
@@ -59,7 +57,6 @@ class BaseTrainer:
         self._gamma = gamma
         self._device = device
         self._save_buffer_every = save_buffer_every
-        self._visualize_every = visualise_every
         self._estimate_q_every = estimate_q_every
         self._stdout_log_every = stdout_log_every
         self._save_policy_every=  save_policy_every
@@ -107,7 +104,6 @@ class BaseTrainer:
             self._algo.update(*batch)
 
             self._eval_routine(env_step, batch)
-            self._visualize(env_step)
             self._save_buffer(env_step)
             self._save_policy(env_step)
             self._log_stdout(env_step, batch)
@@ -148,12 +144,6 @@ class BaseTrainer:
         mean_return = np.mean(returns)
         self._logger.log_scalar("trainer/ep_reward", mean_return, env_step)
 
-    def _visualize(self, env_step: int):
-        if self._visualize_every > 0 and env_step % self._visualize_every == 0:
-            imgs = self.visualise_policy()  # [T, W, H, C]
-            if imgs is not None:
-                self._logger.log_video("eval_policy", imgs, env_step)
-
     def _save_buffer(self, env_step: int):
         # TODO: doesn't work
         if self._save_buffer_every > 0 and env_step % self._save_buffer_every == 0:
@@ -180,26 +170,6 @@ class BaseTrainer:
             print(
                 f"Env step {env_step:8d} ({perc:2d}%) Avg Reward {batch[2].mean():10.3f}"
             )
-
-    def visualise_policy(self):
-        """
-        returned shape: [N, C, W, H]
-        """
-        env = self._make_env_test(seed=self.seed)
-        try:
-            imgs = []
-            state, _ = env.reset()
-            done = False
-            while not done:
-                img = env.render()
-                imgs.append(img)
-                action = self._algo.exploit(state)
-                state, _, terminated, truncated, _ = env.step(action)
-                done = terminated or truncated
-            return np.concatenate(imgs, dtype="uint8")
-        except Exception as e:
-            print(f"Failed to visualise a policy: {e}")
-            return None
 
     def estimate_true_q(self, eval_episodes: int = 10) -> float | None:
         try:
@@ -261,7 +231,6 @@ def run_training(make_algo, make_env, make_logger, config: dict[str, Any], seed:
         eval_interval=config["eval_every"],
         device=config["device"],
         save_buffer_every=config["save_buffer"],
-        visualise_every=config["visualise_every"],
         estimate_q_every=config["estimate_q_every"],
         stdout_log_every=config["log_every"],
         seed=seed,

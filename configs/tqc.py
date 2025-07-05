@@ -1,12 +1,14 @@
-import logging
-
-from oprl.algos.ddpg import DDPG
-from oprl.configs.utils import create_logdir, parse_args
-from oprl.utils.utils import set_logging
-
-set_logging(logging.INFO)
+from oprl.algos import OffPolicyAlgorithm
+from oprl.algos.tqc import TQC
+from oprl.parse_args import parse_args
+from oprl.logging import (
+    create_logdir,
+    set_logging,
+    FileTxtLogger,
+    LoggerProtocol
+)
+set_logging()
 from oprl.env import make_env as _make_env
-from oprl.utils.logger import FileLogger, Logger
 from oprl.utils.run_training import run_training
 
 args = parse_args()
@@ -29,27 +31,28 @@ config = {
     "num_steps": int(100_000),
     "eval_every": 2500,
     "device": args.device,
-    "save_buffer": False,
-    "visualise_every": 50000,
-    "estimate_q_every": 5000,
+    "visualise_every": 0,
+    "estimate_q_every": 0,  # TODO: Here is the unsupported logic
     "log_every": 2500,
 }
 
 # -----------------------------------
 
 
-def make_algo(logger):
-    return DDPG(
+def make_algo(logger: LoggerProtocol) -> OffPolicyAlgorithm:
+    return TQC(
         state_dim=STATE_DIM,
         action_dim=ACTION_DIM,
         device=args.device,
         logger=logger,
-    )
+    ).create()
 
 
-def make_logger(seed: int) -> Logger:
-    log_dir = create_logdir(logdir="logs", algo="DDPG", env=args.env, seed=seed)
-    return FileLogger(log_dir, config)
+def make_logger(seed: int) -> LoggerProtocol:
+    log_dir = create_logdir(logdir="logs", algo="TQC", env=args.env, seed=seed)
+    logger = FileTxtLogger(log_dir, config)
+    logger.copy_source_code()
+    return logger
 
 
 if __name__ == "__main__":
