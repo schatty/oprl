@@ -39,35 +39,45 @@ class SAC:
         self._target_update_coef = target_update_coef
         self._log_every = log_every
 
+        self.lr_actor = lr_actor
+        self.lr_critic = lr_critic
+        self.lr_alpha = lr_alpha
+        self.alpha_init = alpha_init
+        self.device = device
+        self._logger = logger
+
+    def create(self) -> "SAC":
+
         self.actor = GaussianActor(
             state_dim=self._state_dim,
-            action_dim=action_dim,
+            action_dim=self._action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(inplace=True),
-        ).to(device)
+        ).to(self._device)
 
         self.critic = DoubleCritic(
             state_dim=self._state_dim,
             action_dim=self._action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(inplace=True),
-        ).to(device)
+        ).to(self._device)
 
-        self.critic_target = deepcopy(self.critic).to(device).eval()
+        self.critic_target = deepcopy(self.critic).to(self.device).eval()
         disable_gradient(self.critic_target)
 
-        self.optim_actor = Adam(self.actor.parameters(), lr=lr_actor)
-        self.optim_critic = Adam(self.critic.parameters(), lr=lr_critic)
+        self.optim_actor = Adam(self.actor.parameters(), lr=self.lr_actor)
+        self.optim_critic = Adam(self.critic.parameters(), lr=self.lr_critic)
 
-        self._alpha = alpha_init
+        self._alpha = self.alpha_init
         if self._tune_alpha:
             self.log_alpha = t.tensor(
-                np.log(self._alpha), device=device, requires_grad=True
+                np.log(self._alpha), device=self.device, requires_grad=True
             )
-            self.optim_alpha = t.optim.Adam([self.log_alpha], lr=lr_alpha)
-            self._target_entropy = -float(action_dim)
+            self.optim_alpha = t.optim.Adam([self.log_alpha], lr=self.lr_alpha)
+            self._target_entropy = -float(self._action_dim)
 
-        self._logger = logger
+        return self
+
 
     def update(
         self,

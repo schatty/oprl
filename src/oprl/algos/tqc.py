@@ -83,23 +83,35 @@ class TQC:
         self._log_every = log_every
         self._logger = logger
 
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.n_quantiles = n_quantiles
+        self.n_nets = n_nets
+        self.device = device
+
+    def create(self) -> "TQC":
         self.actor = GaussianActor(
-            state_dim,
-            action_dim,
+            self.state_dim,
+            self.action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(),
-        ).to(device)
-        self.critic = QuantileQritic(state_dim, action_dim, n_quantiles, n_nets).to(
-            device
-        )
+        ).to(self.device)
+        self.critic = QuantileQritic(
+            self.state_dim,
+            self.action_dim,
+            self.n_quantiles,
+            self.n_nets
+        ).to(self.device)
         self.critic_target = copy.deepcopy(self.critic)
-        self.log_alpha = t.tensor(np.log(0.2), requires_grad=True, device=device)
+        self.log_alpha = t.tensor(np.log(0.2), requires_grad=True, device=self.device)
         self._quantiles_total = self.critic.n_quantiles * self.critic.n_nets
 
         # TODO: check hyperparams
         self.actor_optimizer = t.optim.Adam(self.actor.parameters(), lr=3e-4)
         self.critic_optimizer = t.optim.Adam(self.critic.parameters(), lr=3e-4)
         self.alpha_optimizer = t.optim.Adam([self.log_alpha], lr=3e-4)
+
+        return self
 
     def update(
         self,

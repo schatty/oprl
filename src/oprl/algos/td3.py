@@ -30,7 +30,8 @@ class TD3:
         device="cpu",
         logger: Logger = StdLogger(),
     ):
-        self._aciton_dim = action_dim
+        self._state_dim = state_dim
+        self._action_dim = action_dim
         self._expl_noise = expl_noise
         self._batch_size = batch_size
         self._discount = discount
@@ -42,30 +43,34 @@ class TD3:
         self._device = device
         self._logger = logger
 
+        self.lr_actor = lr_actor
+        self.lr_critic = lr_critic
         self._log_every = log_every
         self._update_step = 0
 
+    def create(self) -> "TD3":
         self.actor = DeterministicPolicy(
-            state_dim=state_dim,
-            action_dim=action_dim,
+            state_dim=self._state_dim,
+            action_dim=self._action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(inplace=True),
         ).to(self._device)
         self.actor_target = deepcopy(self.actor).to(self._device).eval()
         disable_gradient(self.actor_target)
 
-        self.optim_actor = Adam(self.actor.parameters(), lr=lr_actor)
+        self.optim_actor = Adam(self.actor.parameters(), lr=self.lr_actor)
 
         self.critic = DoubleCritic(
-            state_dim=state_dim,
-            action_dim=action_dim,
+            state_dim=self._state_dim,
+            action_dim=self._action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(inplace=True),
         ).to(self._device)
         self.critic_target = deepcopy(self.critic).to(self._device).eval()
         disable_gradient(self.critic_target)
 
-        self.optim_critic = Adam(self.critic.parameters(), lr=lr_critic)
+        self.optim_critic = Adam(self.critic.parameters(), lr=self.lr_critic)
+        return self
 
     def exploit(self, state: npt.ArrayLike) -> npt.ArrayLike:
         state = t.tensor(state, device=self._device).unsqueeze_(0)
@@ -75,7 +80,7 @@ class TD3:
 
     def explore(self, state: npt.ArrayLike) -> npt.ArrayLike:
         state = t.tensor(state, device=self._device).unsqueeze_(0)
-        noise = (t.randn(self._aciton_dim) * self._max_action * self._expl_noise).to(
+        noise = (t.randn(self._action_dim) * self._max_action * self._expl_noise).to(
             self._device
         )
 

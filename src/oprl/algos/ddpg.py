@@ -1,4 +1,5 @@
 from copy import deepcopy
+from dataclasses import dataclass
 from typing import Any, Dict
 
 import numpy as np
@@ -6,12 +7,13 @@ import numpy.typing as npt
 import torch as t
 from torch import nn
 
+from oprl.algos import OffPolicyAlgorithm
 from oprl.algos.nn import Critic, DeterministicPolicy
 from oprl.algos.utils import disable_gradient
 from oprl.utils.logger import Logger, StdLogger
 
 
-class DDPG:
+class DDPG(OffPolicyAlgorithm):
     def __init__(
         self,
         state_dim: int,
@@ -26,6 +28,7 @@ class DDPG:
     ):
         self._expl_noise = expl_noise
         self._action_dim = action_dim
+        self._state_dim = state_dim
         self._discount = discount
         self._tau = tau
         self._batch_size = batch_size
@@ -33,20 +36,22 @@ class DDPG:
         self._device = device
         self._logger = logger
 
+    def create(self) -> "DDPG":
         self.actor = DeterministicPolicy(
-            state_dim=state_dim,
-            action_dim=action_dim,
+            state_dim=self._state_dim,
+            action_dim=self._action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(inplace=True),
-        ).to(device)
+        ).to(self._device)
         self.actor_target = deepcopy(self.actor)
         disable_gradient(self.actor_target)
         self.optim_actor = t.optim.Adam(self.actor.parameters(), lr=3e-4)
 
-        self.critic = Critic(state_dim, action_dim).to(device)
+        self.critic = Critic(self._state_dim, self._action_dim).to(self._device)
         self.critic_target = deepcopy(self.critic)
         disable_gradient(self.critic_target)
         self.optim_critic = t.optim.Adam(self.critic.parameters(), lr=3e-4)
+        return self
 
     def update(
         self,

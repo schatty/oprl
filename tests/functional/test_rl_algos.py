@@ -18,7 +18,7 @@ def test_rl_algo_run(algo_class):
     algo = algo_class(
         state_dim=env.observation_space.shape[0],
         action_dim=env.action_space.shape[0],
-    )
+    ).create()
     action = algo.exploit(obs)
     assert action.ndim == 1
 
