@@ -1,10 +1,12 @@
 import copy
+from dataclasses import dataclass
 
 import numpy as np
 import numpy.typing as npt
 import torch as t
 import torch.nn as nn
 
+from oprl.algos import OffPolicyAlgorithm
 from oprl.algos.nn import MLP, GaussianActor
 from oprl.utils.logger import Logger, StdLogger
 
@@ -60,36 +62,22 @@ class QuantileQritic(nn.Module):
         return quantiles
 
 
-class TQC:
-    def __init__(
-        self,
-        state_dim: int,
-        action_dim: int,
-        discount: float = 0.99,
-        tau: float = 0.005,
-        top_quantiles_to_drop: int = 2,
-        n_quantiles: int = 25,
-        n_nets: int = 5,
-        log_every: int = 5000,
-        device: str = "cpu",
-        logger: Logger = StdLogger(),
-    ):
-        self._discount = discount
-        self._tau = tau
-        self._top_quantiles_to_drop = top_quantiles_to_drop
-        self._target_entropy = -np.prod(action_dim).item()
-        self._device = device
-        self._update_step = 0
-        self._log_every = log_every
-        self._logger = logger
-
-        self.state_dim = state_dim
-        self.action_dim = action_dim
-        self.n_quantiles = n_quantiles
-        self.n_nets = n_nets
-        self.device = device
+@dataclass
+class TQC(OffPolicyAlgorithm):
+    state_dim: int
+    action_dim: int
+    discount: float = 0.99
+    tau: float = 0.005
+    top_quantiles_to_drop: int = 2
+    n_quantiles: int = 25
+    n_nets: int = 5
+    log_every: int = 5000
+    device: str = "cpu"
+    logger: Logger = StdLogger()
+    update_step = 0
 
     def create(self) -> "TQC":
+        self.target_entropy = -np.prod(self.action_dim).item()
         self.actor = GaussianActor(
             self.state_dim,
             self.action_dim,
@@ -136,16 +124,16 @@ class TQC:
             )  # batch x nets x quantiles
             sorted_z, _ = t.sort(next_z.reshape(batch_size, -1))
             sorted_z_part = sorted_z[
-                :, : self._quantiles_total - self._top_quantiles_to_drop
+                :, : self._quantiles_total - self.top_quantiles_to_drop
             ]
 
             # compute target
-            target = reward + (1 - done) * self._discount * (
+            target = reward + (1 - done) * self.discount * (
                 sorted_z_part - alpha * next_log_pi
             )
 
         cur_z = self.critic(state, action)
-        critic_loss = quantile_huber_loss_f(cur_z, target, self._device)
+        critic_loss = quantile_huber_loss_f(cur_z, target, self.device)
 
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
@@ -155,12 +143,12 @@ class TQC:
             self.critic.parameters(), self.critic_target.parameters()
         ):
             target_param.data.copy_(
-                self._tau * param.data + (1 - self._tau) * target_param.data
+                self.tau * param.data + (1 - self.tau) * target_param.data
             )
 
         # --- Policy and alpha loss ---
         new_action, log_pi = self.actor(state)
-        alpha_loss = -self.log_alpha * (log_pi + self._target_entropy).detach().mean()
+        alpha_loss = -self.log_alpha * (log_pi + self.target_entropy).detach().mean()
         actor_loss = (
             alpha * log_pi
             - self.critic(state, new_action).mean(2).mean(1, keepdim=True)
@@ -176,20 +164,20 @@ class TQC:
         alpha_loss.backward()
         self.alpha_optimizer.step()
 
-        if self._update_step % self._log_every == 0:
-            self._logger.log_scalars(
+        if self.update_step % self.log_every == 0:
+            self.logger.log_scalars(
                 {
                     "algo/critic_loss": critic_loss.item(),
                     "algo/actor_loss": actor_loss.item(),
                     "algo/alpha_loss": alpha_loss.item(),
                 },
-                self._update_step,
+                self.update_step,
             )
 
-        self._update_step += 1
+        self.update_step += 1
 
     def explore(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        state = t.tensor(state, device=self._device).unsqueeze_(0)
+        state = t.tensor(state, device=self.device).unsqueeze_(0)
         with t.no_grad():
             action, _ = self.actor(state)
         return action.cpu().numpy()[0]
