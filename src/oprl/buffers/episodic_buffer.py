@@ -1,8 +1,25 @@
 import os
 import pickle
+from typing import Protocol
 
 import numpy as np
-import torch
+import numpy.typing as npt
+import torch as t
+
+
+class ReplayBufferProtocol(Protocol):
+    def add_transition(self, state, action, reward, done, episode_done=None): ...
+
+    def add_episode(self, episode): ...
+
+    def sample(self, batch_size) -> tuple[
+        t.Tensor, t.Tensor, t.Tensor, t.Tensor, t.Tensor
+    ]: ...
+
+    def save(self, path: str) -> None: ...
+
+    @property
+    def last_episode_length(self) -> int: ...
 
 
 class EpisodicReplayBuffer:
@@ -14,18 +31,8 @@ class EpisodicReplayBuffer:
         device: str,
         gamma: float,
         max_episode_len: int = 1000,
-        dtype=torch.float,
+        dtype=t.float,
     ):
-        """
-        Args:
-            buffer_size: Max number of transitions in buffer.
-            state_dim: Dimension of the state.
-            action_dim: Dimension of the action.
-            device: Device to place buffer.
-            gamma: Discount factor for N-step.
-            max_episode_len: Max length of the episode to store.
-            dtype: Data type.
-        """
         self.buffer_size = buffer_size
         self.max_episodes = buffer_size // max_episode_len
         self.max_episode_len = max_episode_len
@@ -38,50 +45,41 @@ class EpisodicReplayBuffer:
         self.cur_episodes = 1
         self.cur_size = 0
 
-        self.actions = torch.empty(
+        self.actions = t.empty(
             (self.max_episodes, max_episode_len, action_dim),
             dtype=dtype,
             device=device,
         )
-        self.rewards = torch.empty(
+        self.rewards = t.empty(
             (self.max_episodes, max_episode_len, 1), dtype=dtype, device=device
         )
-        self.dones = torch.empty(
+        self.dones = t.empty(
             (self.max_episodes, max_episode_len, 1), dtype=dtype, device=device
         )
-        self.states = torch.empty(
+        self.states = t.empty(
             (self.max_episodes, max_episode_len + 1, state_dim),
             dtype=dtype,
             device=device,
         )
         self.ep_lens = [0] * self.max_episodes
 
-        self.actions_for_std = torch.empty(
+        self.actions_for_std = t.empty(
             (100, action_dim), dtype=dtype, device=device
         )
         self.actions_for_std_cnt = 0
 
-    # TODO: rename to add
-    def append(self, state, action, reward, done, episode_done=None):
-        """
-        Args:
-            state: state.
-            action: action.
-            reward: reward.
-            done: done only if episode ends naturally.
-            episode_done: done that can be set to True if time limit is reached.
-        """
+    def add_transition(self, state: npt.ArrayLike, action: npt.ArrayLike, reward: float, done: bool, episode_done: bool | None = None):
         self.states[self.ep_pointer, self.ep_lens[self.ep_pointer]].copy_(
-            torch.from_numpy(state)
+            t.from_numpy(state)
         )
         self.actions[self.ep_pointer, self.ep_lens[self.ep_pointer]].copy_(
-            torch.from_numpy(action)
+            t.from_numpy(action)
         )
         self.rewards[self.ep_pointer, self.ep_lens[self.ep_pointer]] = float(reward)
         self.dones[self.ep_pointer, self.ep_lens[self.ep_pointer]] = float(done)
 
         self.actions_for_std[self.actions_for_std_cnt % 100].copy_(
-            torch.from_numpy(action)
+            t.from_numpy(action)
         )
         self.actions_for_std_cnt += 1
 
@@ -96,9 +94,9 @@ class EpisodicReplayBuffer:
         self.cur_size -= self.ep_lens[self.ep_pointer]
         self.ep_lens[self.ep_pointer] = 0
 
-    def add_episode(self, episode):
-        for s, a, r, d, s_ in episode:
-            self.append(s, a, r, d, episode_done=d)
+    def add_episode(self, episode: list):
+        for s, a, r, d, _ in episode:
+            self.add_transition(s, a, r, d, episode_done=d)
             if d:
                 break
         else:
@@ -127,10 +125,6 @@ class EpisodicReplayBuffer:
         )
 
     def save(self, path: str):
-        """
-        Args:
-            path: Path to pickle file.
-        """
         dirname = os.path.dirname(path)
         if not os.path.exists(dirname):
             os.makedirs(dirname)
@@ -149,12 +143,13 @@ class EpisodicReplayBuffer:
         except Exception as e:
             print(f"Failed to save replay buffer: {e}")
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.cur_size
 
-    @property
-    def num_episodes(self):
-        return self.cur_episodes
+    # @property
+    # def num_episodes(self):
+    #     return self.cur_episodes
 
-    def get_last_ep_len(self):
+    @property
+    def last_episode_length(self):
         return self.ep_lens[self.ep_pointer]

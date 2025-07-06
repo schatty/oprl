@@ -125,7 +125,7 @@ class DeterministicPolicy(nn.Module):
 
     def exploit(self, state: npt.ArrayLike) -> npt.NDArray:
         state = t.tensor(state).unsqueeze_(0).to(self._device)
-        return self.forward(state).cpu().numpy().flatten()
+        return self.forward(state).detach().cpu().numpy().flatten()
 
     def explore(self, state: npt.ArrayLike) -> npt.NDArray:
         state = t.tensor(state, device=self._device).unsqueeze_(0)
@@ -160,6 +160,11 @@ class GaussianActor(nn.Module):
             action = t.tanh(mean)
             log_prob = None
         return action, log_prob
+
+    def exploit(self, state: npt.ArrayLike) -> npt.NDArray:
+        state = t.tensor(state).unsqueeze_(0).to(self.device)
+        action, _ = self.forward(state)
+        return action.detach().cpu().numpy().flatten()
 
     @property
     def device(self):

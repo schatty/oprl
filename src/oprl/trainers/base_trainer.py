@@ -1,22 +1,22 @@
+from dataclasses import dataclass
 from typing import Any, Callable
 
 import numpy as np
 import torch
 
 from oprl.env import BaseEnv
-from oprl.trainers.buffers.episodic_buffer import EpisodicReplayBuffer
+from oprl.buffers.episodic_buffer import EpisodicReplayBuffer, ReplayBufferProtocol
 from oprl.logging import LoggerProtocol
 
 
+@dataclass
 class BaseTrainer:
     def __init__(
         self,
-        state_dim: int,
-        action_dim: int,
         env: BaseEnv,
         make_env_test: Callable[[int], BaseEnv],
+        replay_buffer: ReplayBufferProtocol,
         algo: Any | None = None,
-        buffer_size: int = int(1e6),
         gamma: float = 0.99,
         num_steps: int = int(1e6),
         start_steps: int = int(10e3),
@@ -31,26 +31,6 @@ class BaseTrainer:
         seed: int = 0,
         logger: LoggerProtocol | None = None,
     ):
-        """
-        Args:
-            state_dim: Dimension of the observation.
-            action_dim: Dimension of the action.
-            env: Enviornment object.
-            make_env_test: Environment object for evaluation.
-            algo: Codename for the algo (SAC).
-            buffer_size: Buffer size in transitions.
-            gamma: Discount factor.
-            num_step: Number of env steps to train.
-            start_steps: Number of environment steps not to perform training at the beginning.
-            batch_size: Batch-size.
-            eval_interval: Number of env step after which perform evaluation.
-            save_buffer_every: Number of env steps after which save replay buffer.
-            visualise_every: Number of env steps after which perform vizualisation.
-            device: Name of the device.
-            stdout_log_every: Number of evn steps after which log info to stdout.
-            seed: Random seed.
-            logger: Logger instance.
-        """
         self._env = env
         self._make_env_test = make_env_test
         self._algo = algo
@@ -62,15 +42,7 @@ class BaseTrainer:
         self._save_policy_every=  save_policy_every
         self._logger = logger
         self.seed = seed
-
-        self.buffer = EpisodicReplayBuffer(
-            buffer_size=buffer_size,
-            state_dim=state_dim,
-            action_dim=action_dim,
-            device=device,
-            gamma=gamma,
-        )
-
+        self.replay_buffer = replay_buffer
         self.batch_size = batch_size
         self.num_steps = num_steps
         self.start_steps = start_steps
@@ -89,7 +61,7 @@ class BaseTrainer:
                 action = self._algo.explore(state)
             next_state, reward, terminated, truncated, _ = self._env.step(action)
 
-            self.buffer.append(
+            self.replay_buffer.add_transition(
                 state, action, reward, terminated, episode_done=terminated or truncated
             )
             if terminated or truncated:
@@ -97,10 +69,10 @@ class BaseTrainer:
                 ep_step = 0
             state = next_state
 
-            if len(self.buffer) < self.batch_size:
+            if len(self.replay_buffer) < self.batch_size:
                 continue
 
-            batch = self.buffer.sample(self.batch_size)
+            batch = self.replay_buffer.sample(self.batch_size)
             self._algo.update(*batch)
 
             self._eval_routine(env_step, batch)
@@ -114,14 +86,14 @@ class BaseTrainer:
 
             self._logger.log_scalar("trainer/avg_reward", batch[2].mean(), env_step)
             self._logger.log_scalar(
-                "trainer/buffer_transitions", len(self.buffer), env_step
+                "trainer/buffer_transitions", len(self.replay_buffer), env_step
             )
             self._logger.log_scalar(
-                "trainer/buffer_episodes", self.buffer.num_episodes, env_step
+                "trainer/buffer_episodes", self.replay_buffer.num_episodes, env_step
             )
             self._logger.log_scalar(
                 "trainer/buffer_last_ep_len",
-                self.buffer.get_last_ep_len(),
+                self.replay_buffer.get_last_ep_len(),
                 env_step,
             )
 
@@ -147,7 +119,7 @@ class BaseTrainer:
     def _save_buffer(self, env_step: int):
         # TODO: doesn't work
         if self._save_buffer_every > 0 and env_step % self._save_buffer_every == 0:
-            self.buffer.save(f"{self.log_dir}/buffers/buffer_step_{env_step}.pickle")
+            self.replay_buffer.save(f"{self.log_dir}/buffers/buffer_step_{env_step}.pickle")
 
     def _save_policy(self, env_step: int):
         if self._save_policy_every > 0 and env_step % self._save_policy_every == 0:
@@ -217,7 +189,7 @@ class BaseTrainer:
         return np.mean(qs, dtype=float)
 
 
-def run_training(make_algo, make_env, make_logger, config: dict[str, Any], seed: int):
+def run_training(make_algo, make_env, make_replay_buffer, make_logger, config: dict[str, Any], seed: int):
     env = make_env(seed=seed)
     logger = make_logger(seed)
 
@@ -227,6 +199,7 @@ def run_training(make_algo, make_env, make_logger, config: dict[str, Any], seed:
         env=env,
         make_env_test=make_env,
         algo=make_algo(logger, seed),
+        replay_buffer=make_replay_buffer(),
         num_steps=config["num_steps"],
         eval_interval=config["eval_every"],
         device=config["device"],

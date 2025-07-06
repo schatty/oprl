@@ -1,5 +1,6 @@
 import logging
 from multiprocessing import Process
+from oprl.env import BaseEnv
 
 from oprl.trainers.base_trainer import BaseTrainer
 from oprl.trainers.safe_trainer import SafeTrainer
@@ -7,17 +8,17 @@ from oprl.utils.utils import set_seed
 
 
 def run_training(
-    make_algo, make_env, make_logger, config, seeds: int = 1, start_seed: int = 0
+    make_algo, make_env, make_replay_buffer, make_logger, config, seeds: int = 1, start_seed: int = 0
 ):
     if seeds == 1:
-        _run_training_func(make_algo, make_env, make_logger, config, 0)
+        _run_training_func(make_algo, make_env, make_replay_buffer, make_logger, config, 0)
     else:
         processes = []
         for seed in range(start_seed, start_seed + seeds):
             processes.append(
                 Process(
                     target=_run_training_func,
-                    args=(make_algo, make_env, make_logger, config, seed),
+                    args=(make_algo, make_env, make_replay_buffer, make_logger, config, seed),
                 )
             )
 
@@ -29,24 +30,18 @@ def run_training(
         logging.info("Training finished.")
 
 
-def _run_training_func(make_algo, make_env, make_logger, config, seed: int):
+def _run_training_func(make_algo, make_env, make_replay_buffer, make_logger, config, seed: int):
     set_seed(seed)
     env = make_env(seed=seed)
+    replay_buffer = make_replay_buffer()
     logger = make_logger(seed)
+    algo = make_algo(logger)
 
-    if env.env_family == "dm_control":
-        trainer_class = BaseTrainer
-    elif env.env_family == "safety_gymnasium":
-        trainer_class = SafeTrainer
-    else:
-        raise ValueError(f"Unsupported env family: {env.env_family}")
-
-    trainer = trainer_class(
-        state_dim=config["state_dim"],
-        action_dim=config["action_dim"],
+    base_trainer = BaseTrainer(
         env=env,
         make_env_test=make_env,
-        algo=make_algo(logger),
+        algo=algo,
+        replay_buffer=replay_buffer,
         num_steps=config["num_steps"],
         eval_interval=config["eval_every"],
         device=config["device"],
@@ -55,5 +50,11 @@ def _run_training_func(make_algo, make_env, make_logger, config, seed: int):
         seed=seed,
         logger=logger,
     )
+    if env.env_family == "dm_control":
+        trainer = base_trainer
+    elif env.env_family == "safety_gymnasium":
+        trainer = SafeTrainer(trainer=base_trainer)
+    else:
+        raise ValueError(f"Unsupported env family: {env.env_family}")
 
     trainer.train()

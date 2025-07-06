@@ -48,7 +48,7 @@ class SafetyGym(BaseEnv):
     def __init__(self, env_name: str, seed: int):
         import safety_gymnasium as gym
 
-        self._env = gym.make(env_name)
+        self._env = gym.make(env_name, render_mode='rgb_array', camera_name="fixednear")
         self._seed = seed
 
     def step(
@@ -62,6 +62,9 @@ class SafetyGym(BaseEnv):
         obs, info = self._env.reset(seed=self._seed)
         self._env.step(self._env.action_space.sample())
         return obs.astype("float32"), info
+    
+    def render(self) -> npt.NDArray:
+        return self._env.render()
 
     def sample_action(self):
         return self._env.action_space.sample()
