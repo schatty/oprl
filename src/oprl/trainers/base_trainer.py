@@ -89,11 +89,11 @@ class BaseTrainer:
                 "trainer/buffer_transitions", len(self.replay_buffer), env_step
             )
             self._logger.log_scalar(
-                "trainer/buffer_episodes", self.replay_buffer.num_episodes, env_step
+                "trainer/buffer_episodes", self.replay_buffer.episodes_counter, env_step
             )
             self._logger.log_scalar(
                 "trainer/buffer_last_ep_len",
-                self.replay_buffer.get_last_ep_len(),
+                self.replay_buffer.last_episode_length,
                 env_step,
             )
 
@@ -194,8 +194,6 @@ def run_training(make_algo, make_env, make_replay_buffer, make_logger, config: d
     logger = make_logger(seed)
 
     trainer = BaseTrainer(
-        state_dim=config["state_shape"],
-        action_dim=config["action_shape"],
         env=env,
         make_env_test=make_env,
         algo=make_algo(logger, seed),

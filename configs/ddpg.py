@@ -58,7 +58,7 @@ def make_replay_buffer() -> ReplayBufferProtocol:
         action_dim=ACTION_DIM,
         device=config["device"],
         gamma=config["gamma"],
-    )
+    ).create()
 
 
 def make_logger(seed: int) -> LoggerProtocol:
