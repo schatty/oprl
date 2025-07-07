@@ -1,10 +1,17 @@
 import logging
+import random
+import numpy as np
+import torch as t
 from multiprocessing import Process
-from oprl.env import BaseEnv
 
 from oprl.trainers.base_trainer import BaseTrainer
 from oprl.trainers.safe_trainer import SafeTrainer
-from oprl.utils.utils import set_seed
+
+
+def set_seed(seed: int) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    t.manual_seed(seed)
 
 
 def run_training(

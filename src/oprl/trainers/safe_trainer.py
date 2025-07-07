@@ -1,10 +1,6 @@
-from typing import Any, Callable
-
 import numpy as np
 
-from oprl.env import BaseEnv
 from oprl.trainers.base_trainer import BaseTrainer
-from oprl.logging import LoggerProtocol
 
 
 class SafeTrainer:

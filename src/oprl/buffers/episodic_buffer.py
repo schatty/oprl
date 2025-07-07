@@ -102,6 +102,9 @@ class EpisodicReplayBuffer(ReplayBufferProtocol):
         self.dones[self._ep_pointer, self.ep_lens[self._ep_pointer]] = float(done)
         self.ep_lens[self._ep_pointer] += 1
         self._number_transitions = min(self._number_transitions + 1, self.buffer_size)
+        # TODO: Switch to the episodic append and remove condition below
+        if episode_done:
+            self._inc_episode()
 
     def _inc_episode(self):
         self._ep_pointer = (self._ep_pointer + 1) % self._max_episodes

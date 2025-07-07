@@ -4,7 +4,7 @@ from typing import Any, Callable
 import numpy as np
 import torch
 
-from oprl.env import BaseEnv
+from oprl.environment import EnvProtocol
 from oprl.buffers.episodic_buffer import ReplayBufferProtocol
 from oprl.logging import LoggerProtocol
 
@@ -13,8 +13,8 @@ from oprl.logging import LoggerProtocol
 class BaseTrainer:
     def __init__(
         self,
-        env: BaseEnv,
-        make_env_test: Callable[[int], BaseEnv],
+        env: EnvProtocol,
+        make_env_test: Callable[[int], EnvProtocol],
         replay_buffer: ReplayBufferProtocol,
         algo: Any | None = None,
         gamma: float = 0.99,

@@ -8,8 +8,8 @@ from oprl.logging import (
     LoggerProtocol
 )
 set_logging()
-from oprl.env import make_env as _make_env
-from oprl.utils.run_training import run_training
+from oprl.environment import make_env as _make_env
+from oprl.train import run_training
 
 args = parse_args()
 

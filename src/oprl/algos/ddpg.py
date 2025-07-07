@@ -10,20 +10,20 @@ from torch import nn
 from oprl.algos import OffPolicyAlgorithm
 from oprl.algos.nn import Critic, DeterministicPolicy
 from oprl.algos.utils import disable_gradient
-from oprl.utils.logger import Logger, StdLogger
+from oprl.logging import LoggerProtocol
 
 
 @dataclass
 class DDPG(OffPolicyAlgorithm):
     state_dim: int
     action_dim: int
+    logger: LoggerProtocol
     expl_noise: float = 0.1
     discount: float = 0.99
     tau: float = 5e-3
     batch_size: int = 256
     max_action: float = 1.
     device: str = "cpu"
-    logger: Logger = StdLogger()
 
     def create(self) -> "DDPG":
         self.actor = DeterministicPolicy(
