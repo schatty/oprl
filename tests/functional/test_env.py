@@ -1,6 +1,6 @@
 import pytest
 
-from oprl.env import make_env
+from oprl.environment import make_env
 
 
 dm_control_envs: list[str] = [

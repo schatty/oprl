@@ -5,7 +5,7 @@ import numpy as np
 import torch
 
 from oprl.env import BaseEnv
-from oprl.buffers.episodic_buffer import EpisodicReplayBuffer, ReplayBufferProtocol
+from oprl.buffers.episodic_buffer import ReplayBufferProtocol
 from oprl.logging import LoggerProtocol
 
 

@@ -5,7 +5,7 @@ from oprl.algos.ddpg import DDPG
 from oprl.algos.sac import SAC
 from oprl.algos.td3 import TD3
 from oprl.algos.tqc import TQC
-from oprl.env import DMControlEnv
+from oprl.environment import DMControlEnv
 
 rl_algo_classes = [DDPG, SAC, TD3, TQC]
 

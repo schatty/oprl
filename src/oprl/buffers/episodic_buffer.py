@@ -24,18 +24,18 @@ class ReplayBufferProtocol(Protocol):
 
 
 @dataclass
-class EpisodicReplayBuffer:
+class EpisodicReplayBuffer(ReplayBufferProtocol):
     buffer_size: int
     state_dim: int
     action_dim: int
     gamma: float
     max_episode_lenth: int = 1000
     device: str = "cpu"
+    episodes_counter: int = 1
 
     _tensors: dict[str, t.Tensor] = field(default_factory=dict, init=False)
-    _max_episodes: int | None = None
+    _max_episodes: int = field(init=False)
     _ep_pointer: int = 0
-    episodes_counter: int = 1
     _number_transitions = 0
     _created: bool = False
 
@@ -100,13 +100,8 @@ class EpisodicReplayBuffer:
         )
         self.rewards[self._ep_pointer, self.ep_lens[self._ep_pointer]] = float(reward)
         self.dones[self._ep_pointer, self.ep_lens[self._ep_pointer]] = float(done)
-
         self.ep_lens[self._ep_pointer] += 1
-
-
         self._number_transitions = min(self._number_transitions + 1, self.buffer_size)
-        if episode_done:
-            self._inc_episode()
 
     def _inc_episode(self):
         self._ep_pointer = (self._ep_pointer + 1) % self._max_episodes
@@ -117,10 +112,7 @@ class EpisodicReplayBuffer:
     def add_episode(self, episode: list):
         for s, a, r, d, _ in episode:
             self.add_transition(s, a, r, d, episode_done=d)
-            if d:
-                break
-        else:
-            self._inc_episode()
+        self._inc_episode()
 
     def _inds_to_episodic(self, inds):
         start_inds = np.cumsum([0] + self.ep_lens[: self.episodes_counter - 1])
