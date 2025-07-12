@@ -2,10 +2,9 @@ from oprl.algos import OffPolicyAlgorithm
 from oprl.algos.sac import SAC
 from oprl.parse_args import parse_args
 from oprl.logging import (
-    create_logdir,
     set_logging,
-    FileTxtLogger,
-    LoggerProtocol
+    LoggerProtocol,
+    make_text_logger_func,
 )
 set_logging()
 from oprl.environment import make_env as _make_env
@@ -48,11 +47,11 @@ def make_algo(logger: LoggerProtocol) -> OffPolicyAlgorithm:
     ).create()
 
 
-def make_logger(seed: int) -> LoggerProtocol:
-    log_dir = create_logdir(logdir="logs", algo="SAC", env=args.env, seed=seed)
-    logger = FileTxtLogger(log_dir, config)
-    logger.copy_source_code()
-    return logger
+make_logger = make_text_logger_func(
+    config=config,
+    algo="SAC",
+    env=args.env,
+)
 
 
 if __name__ == "__main__":

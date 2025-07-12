@@ -5,11 +5,17 @@ from datetime import datetime
 import json
 import shutil
 from abc import ABC, abstractmethod
-from typing import Any, Protocol
+from typing import Any, Protocol, Callable
 
 import torch as t
 import torch.nn as nn
 from torch.utils.tensorboard.writer import SummaryWriter
+
+
+class LoggerProtocol(Protocol):
+    def log_scalar(self, tag: str, value: float, step: int) -> None: ...
+
+    def log_scalars(self, values: dict[str, float], step: int) -> None: ...
 
 
 def create_logdir(logdir: str, algo: str, env: str, seed: int) -> str:
@@ -34,15 +40,19 @@ def copy_exp_dir(log_dir: str) -> None:
     logging.info(f"Source copied into {dest_dir}")
 
 
+def make_text_logger_func(config: dict, algo, env) -> Callable:
+    def make_logger(seed: int) -> LoggerProtocol:
+        logs_root = os.environ.get("OPRL_LOGS", "logs")
+        log_dir = create_logdir(logdir=logs_root, algo=algo, env=env, seed=seed)
+        logger = FileTxtLogger(log_dir, config)
+        logger.copy_source_code()
+        return logger
+    return make_logger
+
+
 def save_json_config(config: dict[str, Any], path: str):
     with open(path, "w") as f:
         json.dump(config, f)
-
-
-class LoggerProtocol(Protocol):
-    def log_scalar(self, tag: str, value: float, step: int) -> None: ...
-
-    def log_scalars(self, values: dict[str, float], step: int) -> None: ...
 
 
 class BaseLogger(ABC):
