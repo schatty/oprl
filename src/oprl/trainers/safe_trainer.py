@@ -10,10 +10,12 @@ class SafeTrainer(TrainerProtocol):
     trainer: BaseTrainer
 
     def train(self):
+        self.algo.check_created()
+        self.replay_buffer.check_created()
+
         ep_step = 0
         state, _ = self.trainer.env.reset()
         total_cost = 0
-
         for env_step in range(self.trainer.num_steps + 1):
             ep_step += 1
             if env_step <= self.trainer.start_steps:

@@ -25,10 +25,6 @@ class EpisodicReplayBuffer(ReplayBufferProtocol):
     _number_transitions = 0
     _created: bool = False
 
-    def _check_if_created(self) -> None:
-        if not self._created:
-            raise RuntimeError("Trying to work with non created buffer. Invoke .create() first.")
-
     def create(self) -> "EpisodicReplayBuffer":
         self._max_episodes = self.buffer_size_transitions // self.max_episode_lenth
         self._tensors = {
@@ -56,6 +52,10 @@ class EpisodicReplayBuffer(ReplayBufferProtocol):
         self.ep_lens = [0] * self._max_episodes
         self._created = True
         return self
+
+    def check_created(self) -> None:
+        if not self._created:
+            raise RuntimeError("Replay buffer has to be created with `.create()`.")
 
     @property
     def states(self) -> t.Tensor:

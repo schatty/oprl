@@ -8,6 +8,12 @@ from oprl.algos.protocols import  AlgorithmProtocol
 
 
 class OffPolicyAlgorithm(ABC, AlgorithmProtocol):
+    def check_created(self) -> None:
+        if not self._created:
+            raise RuntimeError(
+                f"Algorithm {type(self).__name__} has not been created with `create()`."
+        )
+
     def exploit(self, state: npt.NDArray) -> npt.NDArray:
         return self.actor.exploit(state)
 

@@ -31,6 +31,7 @@ class DDPG(OffPolicyAlgorithm):
     critic: nn.Module = field(init=False)
     critic_target: nn.Module = field(init=False)
     optim_critic: t.optim.Optimizer = field(init=False)
+    _created: bool = False
 
     def create(self) -> "DDPG":
         self.actor = DeterministicPolicy(
@@ -50,6 +51,8 @@ class DDPG(OffPolicyAlgorithm):
         self.critic_target = deepcopy(self.critic)
         disable_gradient(self.critic_target)
         self.optim_critic = t.optim.Adam(self.critic.parameters(), lr=3e-4)
+
+        self._created = True
         return self
 
     def update(

@@ -13,8 +13,11 @@ class PolicyProtocol(Protocol):
 
 class AlgorithmProtocol(Protocol):
     actor: PolicyProtocol
+    _created: bool
 
     def create(self) -> "AlgorithmProtocol": ...
+
+    def check_created(self) -> None: ...
 
     def update(
         self,

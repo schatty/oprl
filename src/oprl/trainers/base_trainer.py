@@ -33,9 +33,11 @@ class BaseTrainer(TrainerProtocol):
     seed: int = 0
 
     def train(self) -> None:
+        self.algo.check_created()
+        self.replay_buffer.check_created()
+
         ep_step = 0
         state, _ = self.env.reset()
-
         for env_step in range(self.num_steps + 1):
             ep_step += 1
             if env_step <= self.start_steps:
@@ -66,7 +68,6 @@ class BaseTrainer(TrainerProtocol):
         if env_step % self.eval_interval == 0:
             eval_metrics = self.evaluate()
             self.logger.log_scalar("trainer/ep_reward", eval_metrics["return"], env_step)
-
             self.logger.log_scalar("trainer/avg_reward", batch[2].mean(), env_step)
             self.logger.log_scalar(
                 "trainer/buffer_transitions", len(self.replay_buffer), env_step

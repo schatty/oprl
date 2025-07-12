@@ -5,7 +5,7 @@ import numpy as np
 import torch as t
 import torch.nn as nn
 
-from oprl.algos.protocol import PolicyProtocol
+from oprl.algos.protocols import PolicyProtocol
 from oprl.algos.base_algorithm import OffPolicyAlgorithm
 from oprl.algos.nn_models import MLP, GaussianActor
 from oprl.logging import LoggerProtocol
@@ -84,7 +84,8 @@ class TQC(OffPolicyAlgorithm):
     target_entropy: float = field(init=False)
     alpha_optimizer: t.optim.Optimizer = field(init=False)
     quantiles_total: int = field(init=False)
-    update_step: int = field(init=False)
+    update_step: int = 0
+    _created: bool = False
 
     def create(self) -> "TQC":
         self.target_entropy = -np.prod(self.action_dim).item()
@@ -110,6 +111,8 @@ class TQC(OffPolicyAlgorithm):
         self.critic_optimizer = t.optim.Adam(self.critic.parameters(), lr=3e-4)
         self.alpha_optimizer = t.optim.Adam([self.log_alpha], lr=3e-4)
 
+        self.udpate_step = 0
+        self._created = True
         return self
 
     def update(
