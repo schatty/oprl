@@ -1,12 +1,11 @@
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any
 
-import numpy.typing as npt
 import torch as t
 from torch import nn
 
-from oprl.algos.protocols import OffPolicyAlgorithm, PolicyProtocol
+from oprl.algos.protocols import PolicyProtocol
+from oprl.algos.base_algorithm import OffPolicyAlgorithm
 from oprl.algos.nn_models import Critic, DeterministicPolicy
 from oprl.algos.nn_functions import disable_gradient
 from oprl.logging import LoggerProtocol
@@ -16,9 +15,9 @@ from oprl.logging import LoggerProtocol
 
 @dataclass
 class DDPG(OffPolicyAlgorithm):
+    logger: LoggerProtocol
     state_dim: int
     action_dim: int
-    logger: LoggerProtocol
     expl_noise: float = 0.1
     discount: float = 0.99
     tau: float = 5e-3
@@ -27,7 +26,11 @@ class DDPG(OffPolicyAlgorithm):
     device: str = "cpu"
 
     actor: PolicyProtocol = field(init=False)
+    actor_target: PolicyProtocol = field(init=False)
+    optim_actor: t.optim.Optimizer = field(init=False)
     critic: nn.Module = field(init=False)
+    critic_target: nn.Module = field(init=False)
+    optim_critic: t.optim.Optimizer = field(init=False)
 
     def create(self) -> "DDPG":
         self.actor = DeterministicPolicy(
@@ -98,11 +101,3 @@ class DDPG(OffPolicyAlgorithm):
         actor_loss.backward()
         self.optim_actor.step()
 
-    def exploit(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        return self.actor.exploit(state)
-
-    def explore(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        return self.actor.explore(state)
-
-    def get_policy_state_dict(self) -> dict[str, Any]:
-        return self.actor.state_dict()

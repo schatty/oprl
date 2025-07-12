@@ -1,6 +1,7 @@
-from oprl.algos.protocols import OffPolicyAlgorithm
+from oprl.algos.protocols import AlgorithmProtocol
 from oprl.algos.ddpg import DDPG
-from oprl.buffers.episodic_buffer import ReplayBufferProtocol, EpisodicReplayBuffer
+from oprl.buffers.protocols import ReplayBufferProtocol
+from oprl.buffers.episodic_buffer import EpisodicReplayBuffer
 from oprl.parse_args import parse_args
 from oprl.logging import (
     set_logging,
@@ -39,7 +40,7 @@ config = {
 # -----------------------------------
 
 
-def make_algo(logger: LoggerProtocol) -> OffPolicyAlgorithm:
+def make_algo(logger: LoggerProtocol) -> AlgorithmProtocol:
     return DDPG(
         state_dim=STATE_DIM,
         action_dim=ACTION_DIM,
@@ -50,7 +51,7 @@ def make_algo(logger: LoggerProtocol) -> OffPolicyAlgorithm:
 
 def make_replay_buffer() -> ReplayBufferProtocol:
     return EpisodicReplayBuffer(
-        buffer_size=max(config["num_steps"], int(1e6)),
+        buffer_size_transitions=max(config["num_steps"], int(1e6)),
         state_dim=STATE_DIM,
         action_dim=ACTION_DIM,
         device=config["device"],

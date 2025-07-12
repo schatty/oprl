@@ -1,12 +1,12 @@
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
-import numpy.typing as npt
 import torch as t
 import torch.nn as nn
 
-from oprl.algos.protocol import OffPolicyAlgorithm
+from oprl.algos.protocol import PolicyProtocol
+from oprl.algos.base_algorithm import OffPolicyAlgorithm
 from oprl.algos.nn_models import MLP, GaussianActor
 from oprl.logging import LoggerProtocol
 
@@ -74,7 +74,17 @@ class TQC(OffPolicyAlgorithm):
     n_nets: int = 5
     log_every: int = 5000
     device: str = "cpu"
-    update_step = 0
+
+    actor: PolicyProtocol = field(init=False)
+    actor_target: PolicyProtocol = field(init=False)
+    actor_optimizer: t.optim.Optimizer = field(init=False)
+    critic: QuantileQritic = field(init=False)
+    critic_target: QuantileQritic = field(init=False)
+    critic_optimizer: t.optim.Optimizer = field(init=False)
+    target_entropy: float = field(init=False)
+    alpha_optimizer: t.optim.Optimizer = field(init=False)
+    quantiles_total: int = field(init=False)
+    update_step: int = field(init=False)
 
     def create(self) -> "TQC":
         self.target_entropy = -np.prod(self.action_dim).item()
@@ -93,7 +103,7 @@ class TQC(OffPolicyAlgorithm):
         ).to(self.device)
         self.critic_target = copy.deepcopy(self.critic)
         self.log_alpha = t.tensor(np.log(0.2), requires_grad=True, device=self.device)
-        self._quantiles_total = self.critic.n_quantiles * self.critic.n_nets
+        self.quantiles_total = self.critic.n_quantiles * self.critic.n_nets
 
         # TODO: check hyperparams
         self.actor_optimizer = t.optim.Adam(self.actor.parameters(), lr=3e-4)
@@ -125,7 +135,7 @@ class TQC(OffPolicyAlgorithm):
             )  # batch x nets x quantiles
             sorted_z, _ = t.sort(next_z.reshape(batch_size, -1))
             sorted_z_part = sorted_z[
-                :, : self._quantiles_total - self.top_quantiles_to_drop
+                :, : self.quantiles_total - self.top_quantiles_to_drop
             ]
 
             # compute target
@@ -176,9 +186,3 @@ class TQC(OffPolicyAlgorithm):
             )
 
         self.update_step += 1
-
-    def explore(self, state: npt.NDArray) -> npt.NDArray:
-        return self.actor.explore(state)
-
-    def exploit(self, state: npt.NDArray) -> npt.NDArray:
-        return self.actor.exploit(state)

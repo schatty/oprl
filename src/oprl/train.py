@@ -63,5 +63,4 @@ def _run_training_func(make_algo, make_env, make_replay_buffer, make_logger, con
         trainer = SafeTrainer(trainer=base_trainer)
     else:
         raise ValueError(f"Unsupported env family: {env.env_family}")
-
     trainer.train()

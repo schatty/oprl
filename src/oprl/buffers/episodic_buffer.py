@@ -11,15 +11,15 @@ from oprl.buffers.protocols import ReplayBufferProtocol
 
 @dataclass
 class EpisodicReplayBuffer(ReplayBufferProtocol):
-    buffer_size: int
+    buffer_size_transitions: int
     state_dim: int
     action_dim: int
     gamma: float = 0.99
     max_episode_lenth: int = 1000
-    device: str = "cpu"
     episodes_counter: int = 1
+    device: str = "cpu"
 
-    _tensors: dict[str, t.Tensor] = field(default_factory=dict, init=False)
+    _tensors: dict[str, t.Tensor] = field(init=False)
     _max_episodes: int = field(init=False)
     _ep_pointer: int = 0
     _number_transitions = 0
@@ -30,7 +30,7 @@ class EpisodicReplayBuffer(ReplayBufferProtocol):
             raise RuntimeError("Trying to work with non created buffer. Invoke .create() first.")
 
     def create(self) -> "EpisodicReplayBuffer":
-        self._max_episodes = self.buffer_size // self.max_episode_lenth
+        self._max_episodes = self.buffer_size_transitions // self.max_episode_lenth
         self._tensors = {
             "actions": t.empty(
                 (self._max_episodes, self.max_episode_lenth, self.action_dim),
@@ -87,7 +87,7 @@ class EpisodicReplayBuffer(ReplayBufferProtocol):
         self.rewards[self._ep_pointer, self.ep_lens[self._ep_pointer]] = float(reward)
         self.dones[self._ep_pointer, self.ep_lens[self._ep_pointer]] = float(done)
         self.ep_lens[self._ep_pointer] += 1
-        self._number_transitions = min(self._number_transitions + 1, self.buffer_size)
+        self._number_transitions = min(self._number_transitions + 1, self.buffer_size_transitions)
         # TODO: Switch to the episodic append and remove condition below
         if episode_done:
             self._inc_episode()

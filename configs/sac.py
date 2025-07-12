@@ -1,4 +1,4 @@
-from oprl.algos.protocols import OffPolicyAlgorithm
+from oprl.algos.protocols import AlgorithmProtocol
 from oprl.algos.sac import SAC
 from oprl.parse_args import parse_args
 from oprl.logging import (
@@ -8,7 +8,8 @@ from oprl.logging import (
 )
 set_logging()
 from oprl.environment import make_env as _make_env
-from oprl.buffers.episodic_buffer import ReplayBufferProtocol, EpisodicReplayBuffer
+from oprl.buffers.protocols import ReplayBufferProtocol
+from oprl.buffers.episodic_buffer import EpisodicReplayBuffer
 from oprl.train import run_training
 
 args = parse_args()
@@ -39,7 +40,7 @@ config = {
 # -----------------------------------
 
 
-def make_algo(logger: LoggerProtocol) -> OffPolicyAlgorithm:
+def make_algo(logger: LoggerProtocol) -> AlgorithmProtocol:
     return SAC(
         state_dim=STATE_DIM,
         action_dim=ACTION_DIM,
@@ -57,7 +58,7 @@ make_logger = make_text_logger_func(
 
 def make_replay_buffer() -> ReplayBufferProtocol:
     return EpisodicReplayBuffer(
-        buffer_size=max(config["num_steps"], int(1e6)),
+        buffer_size_transitions=max(config["num_steps"], int(1e6)),
         state_dim=STATE_DIM,
         action_dim=ACTION_DIM,
         device=config["device"],

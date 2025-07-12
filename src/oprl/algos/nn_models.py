@@ -1,5 +1,4 @@
 import numpy as np
-from numpy._typing import NDArray
 import numpy.typing as npt
 import torch as t
 import torch.nn as nn

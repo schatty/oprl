@@ -5,8 +5,16 @@ import numpy.typing as npt
 import torch as t
 
 
-class OffPolicyAlgorithm(Protocol):
-    def create(self) -> "OffPolicyAlgorithm": ...
+class PolicyProtocol(Protocol):
+    def explore(self, state: npt.ArrayLike) -> npt.NDArray: ...
+
+    def exploit(self, state: npt.ArrayLike) -> npt.NDArray: ...
+
+
+class AlgorithmProtocol(Protocol):
+    actor: PolicyProtocol
+
+    def create(self) -> "AlgorithmProtocol": ...
 
     def update(
         self,
@@ -18,7 +26,3 @@ class OffPolicyAlgorithm(Protocol):
     ) -> None: ...
 
 
-class PolicyProtocol(Protocol):
-    def explore(self, state: npt.ArrayLike) -> npt.NDArray: ...
-
-    def exploit(self, state: npt.ArrayLike) -> npt.NDArray: ...

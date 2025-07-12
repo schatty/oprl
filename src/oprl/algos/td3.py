@@ -1,12 +1,12 @@
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-import numpy.typing as npt
 import torch as t
 from torch import nn
 from torch.optim import Adam
 
-from oprl.algos.protocols import OffPolicyAlgorithm
+from oprl.algos.protocols import PolicyProtocol
+from oprl.algos.base_algorithm import OffPolicyAlgorithm
 from oprl.algos.nn_models import DeterministicPolicy, DoubleCritic
 from oprl.algos.nn_functions import disable_gradient, soft_update
 from oprl.logging import LoggerProtocol
@@ -29,7 +29,14 @@ class TD3(OffPolicyAlgorithm):
     tau: float = 5e-3
     log_every: int = 5000
     device: str = "cpu"
-    update_step: int = 0
+
+    actor: PolicyProtocol = field(init=False)
+    actor_target: PolicyProtocol = field(init=False)
+    optim_actor: t.optim.Optimizer = field(init=False)
+    critic: nn.Module = field(init=False)
+    critic_target: nn.Module = field(init=False)
+    optim_critic: t.optim.Optimizer = field(init=False)
+    update_step: int = field(init=False)
 
     def create(self) -> "TD3":
         self.actor = DeterministicPolicy(
@@ -37,6 +44,7 @@ class TD3(OffPolicyAlgorithm):
             action_dim=self.action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(inplace=True),
+            expl_noise=self.expl_noise,
             device=self.device,
         ).to(self.device)
         self.actor_target = deepcopy(self.actor).to(self.device).eval()
@@ -56,11 +64,6 @@ class TD3(OffPolicyAlgorithm):
         self.optim_critic = Adam(self.critic.parameters(), lr=self.lr_critic)
         return self
 
-    def exploit(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        return self.actor.exploit(state)
-
-    def explore(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        return self.actor.explore(state)
 
     def update(self, state: t.Tensor, action, reward, done, next_state) -> None:
         self._update_critic(state, action, reward, done, next_state)

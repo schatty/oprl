@@ -1,10 +1,10 @@
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Callable
 
 import numpy as np
 import torch
 
-from oprl.algos.protocols import OffPolicyAlgorithm
+from oprl.algos.protocols import AlgorithmProtocol
 from oprl.environment import EnvProtocol
 from oprl.buffers.protocols import ReplayBufferProtocol
 from oprl.logging import LoggerProtocol
@@ -14,10 +14,11 @@ from oprl.trainers.protocols import TrainerProtocol
 
 @dataclass
 class BaseTrainer(TrainerProtocol):
+    logger: LoggerProtocol
     env: EnvProtocol
     make_env_test: Callable[[int], EnvProtocol]
     replay_buffer: ReplayBufferProtocol
-    algo: OffPolicyAlgorithm | None = None
+    algo: AlgorithmProtocol
     gamma: float = 0.99
     num_steps: int = int(1e6)
     start_steps: int = int(10e3)
@@ -30,7 +31,6 @@ class BaseTrainer(TrainerProtocol):
     stdout_log_every: int = int(1e5)
     device: str = "cpu"
     seed: int = 0
-    logger: LoggerProtocol | None = None
 
     def train(self) -> None:
         ep_step = 0
@@ -166,25 +166,3 @@ class BaseTrainer(TrainerProtocol):
             qs.append(q)
 
         return np.mean(qs, dtype=float)
-
-
-def run_training(makealgo, makeenv, make_replay_buffer, makelogger, config: dict[str, Any], seed: int):
-    env = makeenv(seed=seed)
-    logger = makelogger(seed)
-
-    trainer = BaseTrainer(
-        env=env,
-        makeenv_test=makeenv,
-        algo=makealgo(logger, seed),
-        replay_buffer=make_replay_buffer(),
-        num_steps=config["num_steps"],
-        eval_interval=config["eval_every"],
-        device=config["device"],
-        save_buffer_every=config["save_buffer"],
-        estimate_q_every=config["estimate_q_every"],
-        stdout_log_every=config["log_every"],
-        seed=seed,
-        logger=logger,
-    )
-
-    trainer.train()
