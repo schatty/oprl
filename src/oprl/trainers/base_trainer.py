@@ -1,71 +1,58 @@
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, Protocol
 
 import numpy as np
 import torch
 
+from oprl.algos import OffPolicyAlgorithm
 from oprl.environment import EnvProtocol
 from oprl.buffers.episodic_buffer import ReplayBufferProtocol
 from oprl.logging import LoggerProtocol
 
 
-@dataclass
-class BaseTrainer:
-    def __init__(
-        self,
-        env: EnvProtocol,
-        make_env_test: Callable[[int], EnvProtocol],
-        replay_buffer: ReplayBufferProtocol,
-        algo: Any | None = None,
-        gamma: float = 0.99,
-        num_steps: int = int(1e6),
-        start_steps: int = int(10e3),
-        batch_size: int = 128,
-        eval_interval: int = int(2e3),
-        num_eval_episodes: int = 10,
-        save_buffer_every: int = 0,
-        save_policy_every: int = int(100_000),
-        estimate_q_every: int = 0,
-        stdout_log_every: int = int(1e5),
-        device: str = "cpu",
-        seed: int = 0,
-        logger: LoggerProtocol | None = None,
-    ):
-        self._env = env
-        self._make_env_test = make_env_test
-        self._algo = algo
-        self._gamma = gamma
-        self._device = device
-        self._save_buffer_every = save_buffer_every
-        self._estimate_q_every = estimate_q_every
-        self._stdout_log_every = stdout_log_every
-        self._save_policy_every=  save_policy_every
-        self._logger = logger
-        self.seed = seed
-        self.replay_buffer = replay_buffer
-        self.batch_size = batch_size
-        self.num_steps = num_steps
-        self.start_steps = start_steps
-        self.eval_interval = eval_interval
-        self.num_eval_episodes = num_eval_episodes
+class TrainerProtocol(Protocol):
+    def train(self) -> None: ...
 
-    def train(self):
+    def evaluate(self) -> dict[str, float]: ...
+
+
+@dataclass
+class BaseTrainer(TrainerProtocol):
+    env: EnvProtocol
+    make_env_test: Callable[[int], EnvProtocol]
+    replay_buffer: ReplayBufferProtocol
+    algo: OffPolicyAlgorithm | None = None
+    gamma: float = 0.99
+    num_steps: int = int(1e6)
+    start_steps: int = int(10e3)
+    batch_size: int = 128
+    eval_interval: int = int(2e3)
+    num_eval_episodes: int = 10
+    save_buffer_every: int = 0
+    save_policy_every: int = int(100_000)
+    estimate_q_every: int = 0
+    stdout_log_every: int = int(1e5)
+    device: str = "cpu"
+    seed: int = 0
+    logger: LoggerProtocol | None = None
+
+    def train(self) -> None:
         ep_step = 0
-        state, _ = self._env.reset()
+        state, _ = self.env.reset()
 
         for env_step in range(self.num_steps + 1):
             ep_step += 1
             if env_step <= self.start_steps:
-                action = self._env.sample_action()
+                action = self.env.sample_action()
             else:
-                action = self._algo.explore(state)
-            next_state, reward, terminated, truncated, _ = self._env.step(action)
+                action = self.algo.explore(state)
+            next_state, reward, terminated, truncated, _ = self.env.step(action)
 
             self.replay_buffer.add_transition(
                 state, action, reward, terminated, episode_done=terminated or truncated
             )
             if terminated or truncated:
-                next_state, _ = self._env.reset()
+                next_state, _ = self.env.reset()
                 ep_step = 0
             state = next_state
 
@@ -73,71 +60,67 @@ class BaseTrainer:
                 continue
 
             batch = self.replay_buffer.sample(self.batch_size)
-            self._algo.update(*batch)
+            self.algo.update(*batch)
 
-            self._eval_routine(env_step, batch)
-            self._save_buffer(env_step)
+            self._log_evaluation(env_step, batch)
             self._save_policy(env_step)
             self._log_stdout(env_step, batch)
 
-    def _eval_routine(self, env_step: int, batch):
+    def _log_evaluation(self, env_step: int, batch):
         if env_step % self.eval_interval == 0:
-            self._log_evaluation(env_step)
+            eval_metrics = self.evaluate()
+            self.logger.log_scalar("trainer/ep_reward", eval_metrics["return"], env_step)
 
-            self._logger.log_scalar("trainer/avg_reward", batch[2].mean(), env_step)
-            self._logger.log_scalar(
+            self.logger.log_scalar("trainer/avg_reward", batch[2].mean(), env_step)
+            self.logger.log_scalar(
                 "trainer/buffer_transitions", len(self.replay_buffer), env_step
             )
-            self._logger.log_scalar(
+            self.logger.log_scalar(
                 "trainer/buffer_episodes", self.replay_buffer.episodes_counter, env_step
             )
-            self._logger.log_scalar(
+            self.logger.log_scalar(
                 "trainer/buffer_last_ep_len",
                 self.replay_buffer.last_episode_length,
                 env_step,
             )
 
-    def _log_evaluation(self, env_step: int):
+    def evaluate(self) -> dict[str, float]:
         returns = []
         for i_ep in range(self.num_eval_episodes):
-            env_test = self._make_env_test(seed=self.seed + i_ep)
+            env_test = self.make_env_test(seed=self.seed + i_ep)
             state, _ = env_test.reset()
 
             episode_return = 0.0
             terminated, truncated = False, False
 
             while not (terminated or truncated):
-                action = self._algo.exploit(state)
+                action = self.algo.exploit(state)
                 state, reward, terminated, truncated, _ = env_test.step(action)
                 episode_return += reward
 
             returns.append(episode_return)
 
-        mean_return = np.mean(returns)
-        self._logger.log_scalar("trainer/ep_reward", mean_return, env_step)
-
-    def _save_buffer(self, env_step: int):
-        # TODO: doesn't work
-        if self._save_buffer_every > 0 and env_step % self._save_buffer_every == 0:
-            self.replay_buffer.save(f"{self.log_dir}/buffers/buffer_step_{env_step}.pickle")
+        return {
+            "return": float(np.mean(returns))
+        }
 
     def _save_policy(self, env_step: int):
-        if self._save_policy_every > 0 and env_step % self._save_policy_every == 0:
-            self._logger.save_weights(self._algo.actor, env_step)
+        if self.save_policy_every > 0 and env_step % self.save_policy_every == 0:
+            self.logger.save_weights(self.algo.actor, env_step)
 
     def _estimate_q(self, env_step: int):
-        if self._estimate_q_every > 0 and env_step % self._estimate_q_every == 0:
+        if self.estimate_q_every > 0 and env_step % self.estimate_q_every == 0:
             q_true = self.estimate_true_q()
             q_critic = self.estimate_critic_q()
             if q_true is not None:
-                self._logger.log_scalar("trainer/Q-estimate", q_true, env_step)
-                self._logger.log_scalar("trainer/Q-critic", q_critic, env_step)
-                self._logger.log_scalar(
+                self.logger.log_scalar("trainer/Q-estimate", q_true, env_step)
+                self.logger.log_scalar("trainer/Q-critic", q_critic, env_step)
+                self.logger.log_scalar(
                     "trainer/Q_asb_diff", q_critic - q_true, env_step
                 )
 
     def _log_stdout(self, env_step: int, batch):
-        if env_step % self._stdout_log_every == 0:
+        if env_step % self.stdout_log_every == 0:
             perc = int(env_step / self.num_steps * 100)
             print(
                 f"Env step {env_step:8d} ({perc:2d}%) Avg Reward {batch[2].mean():10.3f}"
@@ -147,16 +130,16 @@ class BaseTrainer:
         try:
             qs = []
             for i_eval in range(eval_episodes):
-                env = self._make_env_test(seed=self.seed * 100 + i_eval)
+                env = self.make_env_test(seed=self.seed * 100 + i_eval)
                 print("Before reset etimate q")
                 state, _ = env.reset()
 
                 q = 0
                 s_i = 1
                 while True:
-                    action = self._algo.exploit(state)
+                    action = self.algo.exploit(state)
                     state, r, terminated, truncated, _ = env.step(action)
-                    q += r * self._gamma**s_i
+                    q += r * self.gamma ** s_i
                     s_i += 1
                     if terminated or truncated:
                         break
@@ -171,15 +154,15 @@ class BaseTrainer:
     def estimate_critic_q(self, num_episodes: int = 10) -> float:
         qs = []
         for i_eval in range(num_episodes):
-            env = self._make_env_test(seed=self.seed * 100 + i_eval)
+            env = self.make_env_test(seed=self.seed * 100 + i_eval)
 
             state, _ = env.reset()
-            action = self._algo.exploit(state)
+            action = self.algo.exploit(state)
 
-            state = torch.tensor(state).unsqueeze(0).float().to(self._device)
-            action = torch.tensor(action).unsqueeze(0).float().to(self._device)
+            state = torch.tensor(state).unsqueeze(0).float().to(self.device)
+            action = torch.tensor(action).unsqueeze(0).float().to(self.device)
 
-            q = self._algo.critic(state, action)
+            q = self.algo.critic(state, action)
             # TODO: TQC is not supported by this logic, need to update
             if isinstance(q, tuple):
                 q = q[0]
@@ -189,14 +172,14 @@ class BaseTrainer:
         return np.mean(qs, dtype=float)
 
 
-def run_training(make_algo, make_env, make_replay_buffer, make_logger, config: dict[str, Any], seed: int):
-    env = make_env(seed=seed)
-    logger = make_logger(seed)
+def run_training(makealgo, makeenv, make_replay_buffer, makelogger, config: dict[str, Any], seed: int):
+    env = makeenv(seed=seed)
+    logger = makelogger(seed)
 
     trainer = BaseTrainer(
         env=env,
-        make_env_test=make_env,
-        algo=make_algo(logger, seed),
+        makeenv_test=makeenv,
+        algo=makealgo(logger, seed),
         replay_buffer=make_replay_buffer(),
         num_steps=config["num_steps"],
         eval_interval=config["eval_every"],
