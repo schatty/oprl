@@ -6,9 +6,9 @@ import numpy.typing as npt
 import torch as t
 import torch.nn as nn
 
-from oprl.algos import OffPolicyAlgorithm
-from oprl.algos.nn import MLP, GaussianActor
-from oprl.utils.logger import Logger, StdLogger
+from oprl.algos.protocol import OffPolicyAlgorithm
+from oprl.algos.nn_models import MLP, GaussianActor
+from oprl.logging import LoggerProtocol
 
 
 def quantile_huber_loss_f(
@@ -64,6 +64,7 @@ class QuantileQritic(nn.Module):
 
 @dataclass
 class TQC(OffPolicyAlgorithm):
+    logger: LoggerProtocol
     state_dim: int
     action_dim: int
     discount: float = 0.99
@@ -73,7 +74,6 @@ class TQC(OffPolicyAlgorithm):
     n_nets: int = 5
     log_every: int = 5000
     device: str = "cpu"
-    logger: Logger = StdLogger()
     update_step = 0
 
     def create(self) -> "TQC":
@@ -83,6 +83,7 @@ class TQC(OffPolicyAlgorithm):
             self.action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(),
+            device=self.device,
         ).to(self.device)
         self.critic = QuantileQritic(
             self.state_dim,
@@ -176,14 +177,8 @@ class TQC(OffPolicyAlgorithm):
 
         self.update_step += 1
 
-    def explore(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        state = t.tensor(state, device=self.device).unsqueeze_(0)
-        with t.no_grad():
-            action, _ = self.actor(state)
-        return action.cpu().numpy()[0]
+    def explore(self, state: npt.NDArray) -> npt.NDArray:
+        return self.actor.explore(state)
 
-    def exploit(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        self.actor.eval()
-        action = self.explore(state)
-        self.actor.train()
-        return action
+    def exploit(self, state: npt.NDArray) -> npt.NDArray:
+        return self.actor.exploit(state)

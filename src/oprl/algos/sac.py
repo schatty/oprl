@@ -7,14 +7,15 @@ import torch as t
 from torch import nn
 from torch.optim import Adam
 
-from oprl.algos import OffPolicyAlgorithm
-from oprl.algos.nn import DoubleCritic, GaussianActor
-from oprl.algos.utils import disable_gradient, soft_update
-from oprl.utils.logger import Logger, StdLogger
+from oprl.algos.protocols import OffPolicyAlgorithm
+from oprl.algos.nn_models import DoubleCritic, GaussianActor
+from oprl.algos.nn_functions import disable_gradient, soft_update
+from oprl.logging import LoggerProtocol
 
 
 @dataclass
 class SAC(OffPolicyAlgorithm):
+    logger: LoggerProtocol
     state_dim: int
     action_dim: int
     batch_size: int = 256
@@ -27,7 +28,6 @@ class SAC(OffPolicyAlgorithm):
     target_update_coef: float = 5e-3
     device: str = "cpu"
     log_every: int = 5000
-    logger: Logger = StdLogger()
 
     def create(self) -> "SAC":
         self.actor = GaussianActor(
@@ -35,6 +35,7 @@ class SAC(OffPolicyAlgorithm):
             action_dim=self.action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(inplace=True),
+            device=self.device,
         ).to(self.device)
 
         self.critic = DoubleCritic(
@@ -144,14 +145,8 @@ class SAC(OffPolicyAlgorithm):
                 self.update_step,
             )
 
-    def explore(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        state = t.tensor(state, device=self.device).unsqueeze_(0)
-        with t.no_grad():
-            action, _ = self.actor(state)
-        return action.cpu().numpy()[0]
+    def explore(self, state: npt.NDArray) -> npt.NDArray:
+        return self.actor.explore(state)
 
-    def exploit(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        self.actor.eval()
-        action = self.explore(state)
-        self.actor.train()
-        return action
+    def exploit(self, state: npt.NDArray) -> npt.NDArray:
+        return self.actor.exploit(state)

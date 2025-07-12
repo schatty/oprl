@@ -1,7 +1,7 @@
 import numpy.typing as npt
 from typing import Any
 
-from oprl.environment import EnvProtocol
+from oprl.environment.protocols import EnvProtocol
 
 
 class SafetyGym(EnvProtocol):

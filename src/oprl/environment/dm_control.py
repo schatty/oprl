@@ -5,7 +5,7 @@ import numpy as np
 import numpy.typing as npt
 from dm_control import suite
 
-from oprl.environment import EnvProtocol
+from oprl.environment.protocols import EnvProtocol
 
 
 class DMControlEnv(EnvProtocol):

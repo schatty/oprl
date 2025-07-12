@@ -1,4 +1,4 @@
-from oprl.algos import OffPolicyAlgorithm
+from oprl.algos.protocols import OffPolicyAlgorithm
 from oprl.algos.ddpg import DDPG
 from oprl.buffers.episodic_buffer import ReplayBufferProtocol, EpisodicReplayBuffer
 from oprl.parse_args import parse_args
@@ -33,7 +33,6 @@ config = {
     "device": args.device,
     "visualise_every": 50000,
     "estimate_q_every": 5000,
-    "gamma": 0.99,
     "log_every": 2500,
 }
 
@@ -45,7 +44,6 @@ def make_algo(logger: LoggerProtocol) -> OffPolicyAlgorithm:
         state_dim=STATE_DIM,
         action_dim=ACTION_DIM,
         device=args.device,
-        discount=config["gamma"],
         logger=logger,
     ).create()
 
@@ -56,7 +54,6 @@ def make_replay_buffer() -> ReplayBufferProtocol:
         state_dim=STATE_DIM,
         action_dim=ACTION_DIM,
         device=config["device"],
-        gamma=config["gamma"],
     ).create()
 
 

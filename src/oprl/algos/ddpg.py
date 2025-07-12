@@ -1,17 +1,18 @@
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
-import numpy as np
 import numpy.typing as npt
 import torch as t
 from torch import nn
 
-from oprl.algos import OffPolicyAlgorithm
-from oprl.algos.nn import Critic, DeterministicPolicy
-from oprl.algos.utils import disable_gradient
+from oprl.algos.protocols import OffPolicyAlgorithm, PolicyProtocol
+from oprl.algos.nn_models import Critic, DeterministicPolicy
+from oprl.algos.nn_functions import disable_gradient
 from oprl.logging import LoggerProtocol
 
+
+# TODO: Do I need max_action all the time? need to check envs for their max actions
 
 @dataclass
 class DDPG(OffPolicyAlgorithm):
@@ -25,12 +26,18 @@ class DDPG(OffPolicyAlgorithm):
     max_action: float = 1.
     device: str = "cpu"
 
+    actor: PolicyProtocol = field(init=False)
+    critic: nn.Module = field(init=False)
+
     def create(self) -> "DDPG":
         self.actor = DeterministicPolicy(
             state_dim=self.state_dim,
             action_dim=self.action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(inplace=True),
+            expl_noise=self.expl_noise,
+            max_action=self.max_action,
+            device=self.device,
         ).to(self.device)
         self.actor_target = deepcopy(self.actor)
         disable_gradient(self.actor_target)
@@ -81,36 +88,21 @@ class DDPG(OffPolicyAlgorithm):
         current_Q = self.critic(state, action)
 
         critic_loss = (current_Q - target_Q).pow(2).mean()
-
         self.optim_critic.zero_grad()
         critic_loss.backward()
         self.optim_critic.step()
 
     def _update_actor(self, state: t.Tensor) -> None:
         actor_loss = -self.critic(state, self.actor(state)).mean()
-
         self.optim_actor.zero_grad()
         actor_loss.backward()
         self.optim_actor.step()
 
     def exploit(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        state = t.tensor(state, device=self.device).unsqueeze_(0)
-        with t.no_grad():
-            action = self.actor(state).cpu()
-        return action.numpy().flatten()
+        return self.actor.exploit(state)
 
-    # TODO: remove explore from algo to agent completely
     def explore(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        state = t.tensor(state, device=self.device).unsqueeze_(0)
-
-        with t.no_grad():
-            noise = (
-                t.randn(self.action_dim) * self.max_action * self.expl_noise
-            ).to(self.device)
-            action = self.actor(state) + noise
-
-        a = action.cpu().numpy()[0]
-        return np.clip(a, -self.max_action, self.max_action)
+        return self.actor.explore(state)
 
     def get_policy_state_dict(self) -> dict[str, Any]:
         return self.actor.state_dict()

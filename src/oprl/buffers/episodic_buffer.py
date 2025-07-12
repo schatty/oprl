@@ -1,26 +1,12 @@
 from dataclasses import dataclass, field
 import os
 import pickle
-from typing import Protocol
 
 import numpy as np
 import numpy.typing as npt
 import torch as t
 
-
-class ReplayBufferProtocol(Protocol):
-    def add_transition(self, state, action, reward, done, episode_done=None): ...
-
-    def add_episode(self, episode): ...
-
-    def sample(self, batch_size) -> tuple[
-        t.Tensor, t.Tensor, t.Tensor, t.Tensor, t.Tensor
-    ]: ...
-
-    def save(self, path: str) -> None: ...
-
-    @property
-    def last_episode_length(self) -> int: ...
+from oprl.buffers.protocols import ReplayBufferProtocol
 
 
 @dataclass
@@ -28,7 +14,7 @@ class EpisodicReplayBuffer(ReplayBufferProtocol):
     buffer_size: int
     state_dim: int
     action_dim: int
-    gamma: float
+    gamma: float = 0.99
     max_episode_lenth: int = 1000
     device: str = "cpu"
     episodes_counter: int = 1

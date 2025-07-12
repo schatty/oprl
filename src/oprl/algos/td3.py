@@ -1,20 +1,20 @@
 from copy import deepcopy
 from dataclasses import dataclass
 
-import numpy as np
 import numpy.typing as npt
 import torch as t
 from torch import nn
 from torch.optim import Adam
 
-from oprl.algos import OffPolicyAlgorithm
-from oprl.algos.nn import DeterministicPolicy, DoubleCritic
-from oprl.algos.utils import disable_gradient, soft_update
-from oprl.utils.logger import Logger, StdLogger
+from oprl.algos.protocols import OffPolicyAlgorithm
+from oprl.algos.nn_models import DeterministicPolicy, DoubleCritic
+from oprl.algos.nn_functions import disable_gradient, soft_update
+from oprl.logging import LoggerProtocol
 
 
 @dataclass
 class TD3(OffPolicyAlgorithm):
+    logger: LoggerProtocol
     state_dim: int
     action_dim: int
     batch_size: int = 256
@@ -29,7 +29,6 @@ class TD3(OffPolicyAlgorithm):
     tau: float = 5e-3
     log_every: int = 5000
     device: str = "cpu"
-    logger: Logger = StdLogger()
     update_step: int = 0
 
     def create(self) -> "TD3":
@@ -38,6 +37,7 @@ class TD3(OffPolicyAlgorithm):
             action_dim=self.action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(inplace=True),
+            device=self.device,
         ).to(self.device)
         self.actor_target = deepcopy(self.actor).to(self.device).eval()
         disable_gradient(self.actor_target)
@@ -57,22 +57,10 @@ class TD3(OffPolicyAlgorithm):
         return self
 
     def exploit(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        state = t.tensor(state, device=self.device).unsqueeze_(0)
-        with t.no_grad():
-            action = self.actor(state)
-        return action.cpu().numpy().flatten()
+        return self.actor.exploit(state)
 
     def explore(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        state = t.tensor(state, device=self.device).unsqueeze_(0)
-        noise = (t.randn(self.action_dim) * self.max_action * self.expl_noise).to(
-            self.device
-        )
-
-        with t.no_grad():
-            action = self.actor(state) + noise
-
-        a = action.cpu().numpy()[0]
-        return np.clip(a, -self.max_action, self.max_action)
+        return self.actor.explore(state)
 
     def update(self, state: t.Tensor, action, reward, done, next_state) -> None:
         self._update_critic(state, action, reward, done, next_state)

@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from PIL import Image
 
-from oprl.env import make_env
+from oprl.environment import make_env
 
 
 def create_webp_gif(numpy_arrays, output_path, duration=100, loop=0):

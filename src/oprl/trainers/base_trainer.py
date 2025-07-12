@@ -1,19 +1,15 @@
 from dataclasses import dataclass
-from typing import Any, Callable, Protocol
+from typing import Any, Callable
 
 import numpy as np
 import torch
 
-from oprl.algos import OffPolicyAlgorithm
+from oprl.algos.protocols import OffPolicyAlgorithm
 from oprl.environment import EnvProtocol
-from oprl.buffers.episodic_buffer import ReplayBufferProtocol
+from oprl.buffers.protocols import ReplayBufferProtocol
 from oprl.logging import LoggerProtocol
 
-
-class TrainerProtocol(Protocol):
-    def train(self) -> None: ...
-
-    def evaluate(self) -> dict[str, float]: ...
+from oprl.trainers.protocols import TrainerProtocol
 
 
 @dataclass
