@@ -59,22 +59,22 @@ class EpisodicReplayBuffer(ReplayBufferProtocol):
 
     @property
     def states(self) -> t.Tensor:
-        self._check_if_created()
+        self.check_created()
         return self._tensors["states"]
 
     @property
     def actions(self) -> t.Tensor:
-        self._check_if_created()
+        self.check_created()
         return self._tensors["actions"]
 
     @property
     def rewards(self) -> t.Tensor:
-        self._check_if_created()
+        self.check_created()
         return self._tensors["rewards"]
 
     @property
     def dones(self) -> t.Tensor:
-        self._check_if_created()
+        self.check_created()
         return self._tensors["dones"]
 
     def add_transition(self, state: npt.ArrayLike, action: npt.ArrayLike, reward: float, done: bool, episode_done: bool | None = None):
@@ -124,25 +124,6 @@ class EpisodicReplayBuffer(ReplayBufferProtocol):
             self.dones[ep_inds, step_inds],
             self.states[ep_inds, step_inds + 1],
         )
-
-    def save(self, path: str):
-        dirname = os.path.dirname(path)
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
-
-        data = {
-            "states": self.states.cpu(),
-            "actions": self.actions.cpu(),
-            "rewards": self.rewards.cpu(),
-            "dones": self.dones.cpu(),
-            "ep_lens": self.ep_lens,
-        }
-        try:
-            with open(path, "wb") as f:
-                pickle.dump(data, f)
-            print(f"Replay buffer saved to {path}")
-        except Exception as e:
-            print(f"Failed to save replay buffer: {e}")
 
     @property
     def last_episode_length(self):

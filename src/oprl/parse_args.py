@@ -23,4 +23,3 @@ def parse_args() -> argparse.Namespace:
         "--device", type=str, default="cpu", help="Device to perform training on."
     )
     return parser.parse_args()
-

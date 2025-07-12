@@ -1,5 +1,5 @@
 import click
-import torch
+import torch as t
 import numpy as np
 from PIL import Image
 
@@ -63,7 +63,7 @@ def create_webp_gif(numpy_arrays, output_path, duration=100, loop=0):
 def visualize_policy(policy, output, env, seed):
     env = make_env(env, seed=seed)
 
-    actor = torch.load(policy, weights_only=False)
+    actor = t.load(policy, weights_only=False)
     print("Actor loaded: ", type(actor))
 
     imgs = []
@@ -72,7 +72,7 @@ def visualize_policy(policy, output, env, seed):
     while not done:
         img = np.expand_dims(env.render(), axis=0)  # [1, W, H, C]
         imgs.append(img)
-        action = actor.exploit(torch.from_numpy(state))
+        action = actor.exploit(t.from_numpy(state))
         state, _, terminated, truncated, _ = env.step(action)
         done = terminated or truncated
 

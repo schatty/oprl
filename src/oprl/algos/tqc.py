@@ -15,12 +15,8 @@ def quantile_huber_loss_f(
     quantiles: t.Tensor, samples: t.Tensor, device: str
 ) -> t.Tensor:
     """
-    Args:
-        quantiles: [batch, n_nets, n_quantiles].
-        samples: [batch, n_nets * n_quantiles - top_quantiles_to_drop].
-
-    Returns:
-        loss as a torch value.
+    quantiles: [batch, n_nets, n_quantiles].
+    samples: [batch, n_nets * n_quantiles - top_quantiles_to_drop].
     """
     pairwise_delta = (
         samples[:, None, None, :] - quantiles[:, :, :, None]

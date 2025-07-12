@@ -4,16 +4,14 @@ from oprl.buffers.protocols import ReplayBufferProtocol
 from oprl.buffers.episodic_buffer import EpisodicReplayBuffer
 from oprl.parse_args import parse_args
 from oprl.logging import (
-    set_logging,
     LoggerProtocol,
     make_text_logger_func,
 )
-set_logging()
 from oprl.environment import make_env as _make_env
-from oprl.train import run_training
+from oprl.runners.train import run_training
+
 
 args = parse_args()
-
 
 def make_env(seed: int):
     return _make_env(args.env, seed=seed)
@@ -66,7 +64,6 @@ make_logger = make_text_logger_func(
 
 
 if __name__ == "__main__":
-    args = parse_args()
     run_training(
         make_algo=make_algo,
         make_env=make_env,
@@ -76,3 +73,5 @@ if __name__ == "__main__":
         seeds=args.seeds,
         start_seed=args.start_seed
     )
+
+

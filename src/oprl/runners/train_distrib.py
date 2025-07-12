@@ -1,10 +1,8 @@
 import argparse
 import os
-import time
 from datetime import datetime
 from multiprocessing import Process
 
-import torch
 import torch.nn as nn
 from algos.ddpg import DDPG, DeterministicPolicy
 from distrib.distrib_runner import env_worker, policy_update_worker
@@ -12,7 +10,6 @@ from env import DMControlEnv, make_env
 from trainers.buffers.episodic_buffer import EpisodicReplayBuffer
 from utils.logger import Logger
 
-print("Imports ok.")
 
 
 def parse_args():

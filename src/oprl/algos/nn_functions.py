@@ -1,9 +1,9 @@
-import torch
+import torch as t
 
 
 def soft_update(target, source, tau):
     """Update target network using Polyak-Ruppert Averaging."""
-    with torch.no_grad():
+    with t.no_grad():
         for tgt, src in zip(target.parameters(), source.parameters()):
             tgt.data.mul_(1.0 - tau)
             tgt.data.add_(tau * src.data)

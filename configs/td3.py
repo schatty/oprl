@@ -10,7 +10,7 @@ from oprl.logging import (
 )
 set_logging()
 from oprl.environment import make_env as _make_env
-from oprl.train import run_training
+from oprl.runners.train import run_training
 
 args = parse_args()
 
@@ -65,7 +65,6 @@ make_logger = make_text_logger_func(
 
 
 if __name__ == "__main__":
-    args = parse_args()
     run_training(
         make_algo=make_algo,
         make_env=make_env,

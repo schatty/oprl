@@ -2,14 +2,17 @@ from dataclasses import dataclass
 from typing import Callable
 
 import numpy as np
-import torch
+import torch as t
 
 from oprl.algos.protocols import AlgorithmProtocol
 from oprl.environment import EnvProtocol
 from oprl.buffers.protocols import ReplayBufferProtocol
-from oprl.logging import LoggerProtocol
+from oprl.logging import LoggerProtocol, create_stdout_logger
 
 from oprl.trainers.protocols import TrainerProtocol
+
+
+logger = create_stdout_logger()
 
 
 @dataclass
@@ -119,7 +122,7 @@ class BaseTrainer(TrainerProtocol):
     def _log_stdout(self, env_step: int, batch):
         if env_step % self.stdout_log_every == 0:
             perc = int(env_step / self.num_steps * 100)
-            print(
+            logger.info(
                 f"Env step {env_step:8d} ({perc:2d}%) Avg Reward {batch[2].mean():10.3f}"
             )
 
@@ -128,7 +131,6 @@ class BaseTrainer(TrainerProtocol):
             qs = []
             for i_eval in range(eval_episodes):
                 env = self.make_env_test(seed=self.seed * 100 + i_eval)
-                print("Before reset etimate q")
                 state, _ = env.reset()
 
                 q = 0
@@ -145,7 +147,7 @@ class BaseTrainer(TrainerProtocol):
 
             return np.mean(qs, dtype=float)
         except Exception as e:
-            print(f"Failed to estimate Q-value: {e}")
+            logger.warning(f"Failed to estimate Q-value: {e}")
             return None
 
     def estimate_critic_q(self, num_episodes: int = 10) -> float:
@@ -156,8 +158,8 @@ class BaseTrainer(TrainerProtocol):
             state, _ = env.reset()
             action = self.algo.exploit(state)
 
-            state = torch.tensor(state).unsqueeze(0).float().to(self.device)
-            action = torch.tensor(action).unsqueeze(0).float().to(self.device)
+            state = t.tensor(state).unsqueeze(0).float().to(self.device)
+            action = t.tensor(action).unsqueeze(0).float().to(self.device)
 
             q = self.algo.critic(state, action)
             # TODO: TQC is not supported by this logic, need to update

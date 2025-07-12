@@ -10,7 +10,7 @@ set_logging()
 from oprl.environment import make_env as _make_env
 from oprl.buffers.protocols import ReplayBufferProtocol
 from oprl.buffers.episodic_buffer import EpisodicReplayBuffer
-from oprl.train import run_training
+from oprl.runners.train import run_training
 
 args = parse_args()
 
