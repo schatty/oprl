@@ -2,15 +2,14 @@ from oprl.algos.protocols import AlgorithmProtocol
 from oprl.algos.tqc import TQC
 from oprl.parse_args import parse_args
 from oprl.logging import (
-    set_logging,
     LoggerProtocol,
     make_text_logger_func,
 )
-set_logging()
 from oprl.environment import make_env as _make_env
 from oprl.buffers.protocols import ReplayBufferProtocol
 from oprl.buffers.episodic_buffer import EpisodicReplayBuffer
 from oprl.runners.train import run_training
+from oprl.runners.config import CommonParameters
 
 args = parse_args()
 
@@ -24,20 +23,15 @@ STATE_DIM: int = env.observation_space.shape[0]
 ACTION_DIM: int = env.action_space.shape[0]
 
 
-# --------  Config params -----------
-
-config = {
-    "state_dim": STATE_DIM,
-    "action_dim": ACTION_DIM,
-    "num_steps": int(100_000),
-    "eval_every": 2500,
-    "device": args.device,
-    "visualise_every": 0,
-    "estimate_q_every": 0,  # TODO: Here is the unsupported logic
-    "log_every": 2500,
-}
-
-# -----------------------------------
+config = CommonParameters(
+    state_dim=STATE_DIM,
+    action_dim=ACTION_DIM,
+    num_steps=int(100_000),
+    eval_every=2500,
+    device=args.device,
+    estimate_q_every=0,  # TODO: unsupported logic
+    log_every=2500,
+)
 
 
 def make_algo(logger: LoggerProtocol) -> AlgorithmProtocol:
@@ -50,7 +44,6 @@ def make_algo(logger: LoggerProtocol) -> AlgorithmProtocol:
 
 
 make_logger = make_text_logger_func(
-    config=config,
     algo="TQC",
     env=args.env,
 )
@@ -58,10 +51,10 @@ make_logger = make_text_logger_func(
 
 def make_replay_buffer() -> ReplayBufferProtocol:
     return EpisodicReplayBuffer(
-        buffer_size_transitions=max(config["num_steps"], int(1e6)),
+        buffer_size_transitions=max(config.num_steps, int(1e6)),
         state_dim=STATE_DIM,
         action_dim=ACTION_DIM,
-        device=config["device"],
+        device=config.device,
     ).create()
 
 

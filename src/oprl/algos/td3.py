@@ -37,6 +37,7 @@ class TD3(OffPolicyAlgorithm):
     critic_target: nn.Module = field(init=False)
     optim_critic: t.optim.Optimizer = field(init=False)
     update_step: int = 0
+    _created: bool = False
 
     def create(self) -> "TD3":
         self.actor = DeterministicPolicy(
@@ -62,6 +63,8 @@ class TD3(OffPolicyAlgorithm):
         disable_gradient(self.critic_target)
 
         self.optim_critic = Adam(self.critic.parameters(), lr=self.lr_critic)
+
+        self._created = True
         return self
 
 

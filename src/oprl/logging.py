@@ -3,10 +3,9 @@ from pathlib import Path
 import sys
 import logging
 from datetime import datetime
-import json
 import shutil
 from abc import ABC, abstractmethod
-from typing import Any, Protocol, Callable
+from typing import Protocol, Callable
 
 import torch as t
 import torch.nn as nn
@@ -45,19 +44,14 @@ def copy_exp_dir(log_dir: Path) -> None:
     logging.info(f"Source copied into {dest_dir}")
 
 
-def make_text_logger_func(config: dict, algo, env) -> Callable:
+def make_text_logger_func(algo, env) -> Callable:
     def make_logger(seed: int) -> LoggerProtocol:
         logs_root = os.environ.get("OPRL_LOGS", "logs")
         log_dir = get_logs_path(logdir=logs_root, algo=algo, env=env, seed=seed)
-        logger = FileTxtLogger(log_dir, config)
+        logger = FileTxtLogger(log_dir)
         logger.copy_source_code()
         return logger
     return make_logger
-
-
-def save_json_config(config: dict[str, Any], path: Path) -> None:
-    with open(path, "w") as f:
-        json.dump(config, f)
 
 
 class BaseLogger(ABC):
@@ -74,16 +68,25 @@ class BaseLogger(ABC):
         (self.log_scalar(k, v, step) for k, v in values.items())
 
 
+logger = create_stdout_logger()
+
+
 class FileTxtLogger(BaseLogger):
-    def __init__(self, logdir: Path | str, config: dict[str, Any]) -> None:
+    def __init__(self, logdir: Path | str) -> None:
         self.writer = SummaryWriter(logdir)
         self.log_dir = Path(logdir)
-        self.config = config
 
     def copy_source_code(self) -> None:
         copy_exp_dir(self.log_dir)
-        logging.info(f"Source code is copied to {self.log_dir}.")
-        save_json_config(self.config, self.log_dir / "config.json")
+        logger.info(f"Source code is copied to {self.log_dir}")
+        self._copy_config_file()
+
+    def _copy_config_file(self) -> None:
+        main_module = sys.modules.get('__main__')
+        if main_module and hasattr(main_module, '__file__'):
+            shutil.copyfile(main_module.__file__, self.log_dir / Path(main_module.__file__).name)
+        else:
+            logger.warning("Failed to copy config file.")
 
     def log_scalar(self, tag: str, value: float, step: int) -> None:
         self.writer.add_scalar(tag, value, step)

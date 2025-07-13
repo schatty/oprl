@@ -37,6 +37,7 @@ class SAC(OffPolicyAlgorithm):
     optim_critic: t.optim.Optimizer = field(init=False)
     alpha: float = field(init=False)
     update_step: int = 0
+    _created: bool = False
 
     def create(self) -> "SAC":
         self.actor = GaussianActor(
@@ -68,6 +69,7 @@ class SAC(OffPolicyAlgorithm):
             self.optim_alpha = t.optim.Adam([self.log_alpha], lr=self.lr_alpha)
             self.target_entropy = -float(self.action_dim)
 
+        self._created = True
         return self
 
     def update(
@@ -146,7 +148,7 @@ class SAC(OffPolicyAlgorithm):
             self.logger.log_scalars(
                 {
                     "algo/loss_actor": loss_actor.item(),
-                    "algo/alpha": self._alpha,
+                    "algo/alpha": self.alpha,
                     "algo/log_pi": log_pi.cpu().mean(),
                 },
                 self.update_step,
