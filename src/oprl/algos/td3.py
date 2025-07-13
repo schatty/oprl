@@ -22,7 +22,7 @@ class TD3(OffPolicyAlgorithm):
     expl_noise: float = 0.1
     noise_clip: float = 0.5
     policy_freq: int = 2
-    discount: float = 0.99
+    gamma: float = 0.99
     lr_actor: float = 3e-4
     lr_critic: float = 3e-4
     max_action: float = 1.0
@@ -36,7 +36,7 @@ class TD3(OffPolicyAlgorithm):
     critic: nn.Module = field(init=False)
     critic_target: nn.Module = field(init=False)
     optim_critic: t.optim.Optimizer = field(init=False)
-    update_step: int = field(init=False)
+    update_step: int = 0
 
     def create(self) -> "TD3":
         self.actor = DeterministicPolicy(
@@ -96,7 +96,7 @@ class TD3(OffPolicyAlgorithm):
             q1_next, q2_next = self.critic_target(next_state, next_actions)
             q_next = t.min(q1_next, q2_next)
 
-        q_target = reward + (1.0 - done) * self.discount * q_next
+        q_target = reward + (1.0 - done) * self.gamma * q_next
 
         td_error1 = (q1 - q_target).pow(2).mean()
         td_error2 = (q2 - q_target).pow(2).mean()

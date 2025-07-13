@@ -36,7 +36,7 @@ class SAC(OffPolicyAlgorithm):
     critic_target: nn.Module = field(init=False)
     optim_critic: t.optim.Optimizer = field(init=False)
     alpha: float = field(init=False)
-    update_step: int = field(init=False)
+    update_step: int = 0
 
     def create(self) -> "SAC":
         self.actor = GaussianActor(
@@ -67,7 +67,6 @@ class SAC(OffPolicyAlgorithm):
             )
             self.optim_alpha = t.optim.Adam([self.log_alpha], lr=self.lr_alpha)
             self.target_entropy = -float(self.action_dim)
-        self.update_step = 0
 
         return self
 

@@ -19,7 +19,9 @@ class DDPG(OffPolicyAlgorithm):
     state_dim: int
     action_dim: int
     expl_noise: float = 0.1
-    discount: float = 0.99
+    gamma: float = 0.99
+    lr_actor: float = 3e-4
+    lr_critic: float = 3e-4
     tau: float = 5e-3
     batch_size: int = 256
     max_action: float = 1.
@@ -31,6 +33,7 @@ class DDPG(OffPolicyAlgorithm):
     critic: nn.Module = field(init=False)
     critic_target: nn.Module = field(init=False)
     optim_critic: t.optim.Optimizer = field(init=False)
+    update_step: int = 0
     _created: bool = False
 
     def create(self) -> "DDPG":
@@ -45,12 +48,12 @@ class DDPG(OffPolicyAlgorithm):
         ).to(self.device)
         self.actor_target = deepcopy(self.actor)
         disable_gradient(self.actor_target)
-        self.optim_actor = t.optim.Adam(self.actor.parameters(), lr=3e-4)
+        self.optim_actor = t.optim.Adam(self.actor.parameters(), lr=self.lr_actor)
 
         self.critic = Critic(self.state_dim, self.action_dim).to(self.device)
         self.critic_target = deepcopy(self.critic)
         disable_gradient(self.critic_target)
-        self.optim_critic = t.optim.Adam(self.critic.parameters(), lr=3e-4)
+        self.optim_critic = t.optim.Adam(self.critic.parameters(), lr=self.lr_critic)
 
         self._created = True
         return self
@@ -90,7 +93,7 @@ class DDPG(OffPolicyAlgorithm):
         next_state: t.Tensor,
     ) -> None:
         target_Q = self.critic_target(next_state, self.actor_target(next_state))
-        target_Q = reward + (1.0 - done) * self.discount * target_Q.detach()
+        target_Q = reward + (1.0 - done) * self.gamma * target_Q.detach()
         current_Q = self.critic(state, action)
 
         critic_loss = (current_Q - target_Q).pow(2).mean()

@@ -63,7 +63,10 @@ class TQC(OffPolicyAlgorithm):
     logger: LoggerProtocol
     state_dim: int
     action_dim: int
-    discount: float = 0.99
+    gamma: float = 0.99
+    lr_actor = 3e-4
+    lr_critic = 3e-4
+    lr_alpha = 3e-4
     tau: float = 0.005
     top_quantiles_to_drop: int = 2
     n_quantiles: int = 25
@@ -103,11 +106,10 @@ class TQC(OffPolicyAlgorithm):
         self.quantiles_total = self.critic.n_quantiles * self.critic.n_nets
 
         # TODO: check hyperparams
-        self.actor_optimizer = t.optim.Adam(self.actor.parameters(), lr=3e-4)
-        self.critic_optimizer = t.optim.Adam(self.critic.parameters(), lr=3e-4)
-        self.alpha_optimizer = t.optim.Adam([self.log_alpha], lr=3e-4)
+        self.actor_optimizer = t.optim.Adam(self.actor.parameters(), lr=self.lr_actor)
+        self.critic_optimizer = t.optim.Adam(self.critic.parameters(), lr=self.lr_critic)
+        self.alpha_optimizer = t.optim.Adam([self.log_alpha], lr=self.lr_alpha)
 
-        self.udpate_step = 0
         self._created = True
         return self
 
@@ -138,7 +140,7 @@ class TQC(OffPolicyAlgorithm):
             ]
 
             # compute target
-            target = reward + (1 - done) * self.discount * (
+            target = reward + (1 - done) * self.gamma * (
                 sorted_z_part - alpha * next_log_pi
             )
 
