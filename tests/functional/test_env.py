@@ -52,14 +52,6 @@ gymnasium_envs: list[str] = [
 # ]
 
 
-safety_envs: list[str] = [
-    "SafetyPointGoal1-v0",
-    "SafetyPointButton1-v0",
-    "SafetyPointPush1-v0",
-    "SafetyPointCircle1-v0",
-]
-
-
 env_names: list[str] = dm_control_envs + safety_envs + gymnasium_envs
 
 
