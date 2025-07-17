@@ -26,7 +26,7 @@ jobs:
     - name: MyPy
       run: |
         docker run --rm oprl sh -c "
-          uv run mypy --ignore-missing-imports  --python-version 3.10 src/oprl/runners src/oprl/trainers src/opr/buffers
+          uv run mypy --ignore-missing-imports  --python-version 3.10 src/oprl/runners src/oprl/trainers src/oprl/buffers
         "
 
     - name: Extract coverage
