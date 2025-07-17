@@ -46,6 +46,14 @@ gymnasium_envs: list[str] = [
 ]
 
 
+safety_envs: list[str] = [
+    "SafetyPointGoal1-v0",
+    "SafetyPointButton1-v0",
+    "SafetyPointPush1-v0",
+    "SafetyPointCircle1-v0",
+]
+
+
 # TODO:
 # gymansium_robotics_envs: list[str] = [
 #     "FetchPickAndPlace-v3",
