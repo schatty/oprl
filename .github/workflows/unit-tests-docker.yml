@@ -13,14 +13,21 @@ jobs:
     
     - name: Build Docker image
       run: docker build -t oprl .
+
+    - name: Ruff
+      run: |
+        docker run --rm sh -c "
+          uv run ruff check src
+        "
     
     - name: Unit Tests
       run: docker run --rm oprl
 
     - name: MyPy
-      run: docker run --rm sh -c "
-        uv run mypy --ignore-missing-imports  --python-version 3.10 src/oprl/runners src/oprl/trainers src/opr/buffers
-      "
+      run: |
+        docker run --rm sh -c "
+          uv run mypy --ignore-missing-imports  --python-version 3.10 src/oprl/runners src/oprl/trainers src/opr/buffers
+        "
 
     - name: Extract coverage
       run: |

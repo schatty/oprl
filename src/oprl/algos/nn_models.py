@@ -4,7 +4,7 @@ import numpy as np
 import numpy.typing as npt
 import torch as t
 import torch.nn as nn
-from torch.distributions import Distribution, Normal
+from torch.distributions import Normal
 from torch.nn.functional import logsigmoid
 
 
