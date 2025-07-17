@@ -37,7 +37,7 @@ def quantile_huber_loss_f(
 
 
 class QuantileQritic(nn.Module):
-    def __init__(self, state_dim: int, action_dim: int, n_quantiles: int, n_nets: int):
+    def __init__(self, state_dim: int, action_dim: int, n_quantiles: int, n_nets: int) -> None:
         super().__init__()
         self.nets = []
         self.n_quantiles = n_quantiles

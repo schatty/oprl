@@ -1,28 +1,34 @@
 import pytest
 import torch
 
+from oprl.algos.protocols import AlgorithmProtocol
 from oprl.algos.ddpg import DDPG
 from oprl.algos.sac import SAC
 from oprl.algos.td3 import TD3
 from oprl.algos.tqc import TQC
 from oprl.environment import DMControlEnv
+from oprl.logging import FileTxtLogger
 
-rl_algo_classes = [DDPG, SAC, TD3, TQC]
+
+rl_algo_classes: list[type[AlgorithmProtocol]] = [DDPG, SAC, TD3, TQC]
 
 
 @pytest.mark.parametrize("algo_class", rl_algo_classes)
-def test_rl_algo_run(algo_class):
+def test_rl_algo_run(algo_class: type[AlgorithmProtocol]) -> None:
     env = DMControlEnv("walker-walk", seed=0)
-    obs, _ = env.reset(env.sample_action())
+    # TODO: Change to mocked logger
+    logger = FileTxtLogger(".")
+    obs, _ = env.reset()
 
     algo = algo_class(
+        logger=logger,
         state_dim=env.observation_space.shape[0],
         action_dim=env.action_space.shape[0],
     ).create()
-    action = algo.exploit(obs)
+    action = algo.actor.exploit(obs)
     assert action.ndim == 1
 
-    action = algo.explore(obs)
+    action = algo.actor.explore(obs)
     assert action.ndim == 1
 
     _batch_size = 8

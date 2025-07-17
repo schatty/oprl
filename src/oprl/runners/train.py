@@ -1,11 +1,18 @@
+from typing import Callable
 import logging
 import random
-import numpy as np
-import torch as t
 from multiprocessing import Process
 
+import numpy as np
+import torch as t
+
+from oprl.algos.protocols import AlgorithmProtocol
+from oprl.buffers.protocols import ReplayBufferProtocol
+from oprl.environment.protocols import EnvProtocol
 from oprl.trainers.base_trainer import BaseTrainer
 from oprl.trainers.safe_trainer import SafeTrainer
+from oprl.logging import LoggerProtocol
+from oprl.runners.config import CommonParameters
 
 
 def set_seed(seed: int) -> None:
@@ -15,8 +22,14 @@ def set_seed(seed: int) -> None:
 
 
 def run_training(
-    make_algo, make_env, make_replay_buffer, make_logger, config, seeds: int = 1, start_seed: int = 0
-):
+    make_algo: Callable[[LoggerProtocol], AlgorithmProtocol],
+    make_env: Callable[[int], EnvProtocol],
+    make_replay_buffer: Callable[[], ReplayBufferProtocol],
+    make_logger: Callable[[int], LoggerProtocol],
+    config: CommonParameters,
+    seeds: int = 1,
+    start_seed: int = 0
+) -> None:
     if seeds == 1:
         _run_training_func(make_algo, make_env, make_replay_buffer, make_logger, config, 0)
     else:
@@ -37,7 +50,14 @@ def run_training(
         logging.info("Training finished.")
 
 
-def _run_training_func(make_algo, make_env, make_replay_buffer, make_logger, config, seed: int):
+def _run_training_func(
+        make_algo: Callable[[LoggerProtocol], AlgorithmProtocol],
+        make_env: Callable[[int], EnvProtocol],
+        make_replay_buffer: Callable[[], ReplayBufferProtocol],
+        make_logger: Callable[[int], LoggerProtocol],
+        config: CommonParameters,
+        seed: int,
+) -> None:
     set_seed(seed)
     env = make_env(seed=seed)
     replay_buffer = make_replay_buffer()

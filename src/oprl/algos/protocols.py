@@ -3,6 +3,7 @@ from typing import Protocol
 import numpy.typing as npt
 
 import torch as t
+import torch.nn as nn
 
 
 class PolicyProtocol(Protocol):
@@ -10,9 +11,12 @@ class PolicyProtocol(Protocol):
 
     def exploit(self, state: npt.NDArray) -> npt.NDArray: ...
 
+    def __call__(*args, **kwargs) -> t.Tensor: ...
+
 
 class AlgorithmProtocol(Protocol):
     actor: PolicyProtocol
+    critic: nn.Module
     _created: bool
 
     def create(self) -> "AlgorithmProtocol": ...

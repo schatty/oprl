@@ -4,6 +4,7 @@ import torch as t
 
 
 class ReplayBufferProtocol(Protocol):
+    episodes_counter: int
     _created: bool
 
     def create(self) -> "ReplayBufferProtocol": ...
@@ -17,6 +18,8 @@ class ReplayBufferProtocol(Protocol):
     def sample(self, batch_size) -> tuple[
         t.Tensor, t.Tensor, t.Tensor, t.Tensor, t.Tensor
     ]: ...
+
+    def __len__(self) -> int: ...
 
     @property
     def last_episode_length(self) -> int: ...

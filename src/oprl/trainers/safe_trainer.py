@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+import torch as t
 import numpy as np
 
 from oprl.trainers.base_trainer import BaseTrainer, TrainerProtocol
@@ -10,8 +11,8 @@ class SafeTrainer(TrainerProtocol):
     trainer: BaseTrainer
 
     def train(self):
-        self.algo.check_created()
-        self.replay_buffer.check_created()
+        self.trainer.algo.check_created()
+        self.trainer.replay_buffer.check_created()
 
         ep_step = 0
         state, _ = self.trainer.env.reset()
@@ -21,7 +22,7 @@ class SafeTrainer(TrainerProtocol):
             if env_step <= self.trainer.start_steps:
                 action = self.trainer.env.sample_action()
             else:
-                action = self.trainer.algo.explore(state)
+                action = self.trainer.algo.actor.explore(state)
             next_state, reward, terminated, truncated, info = self.trainer.env.step(action)
             total_cost += info["cost"]
 
@@ -35,16 +36,22 @@ class SafeTrainer(TrainerProtocol):
 
             if len(self.trainer.replay_buffer) < self.trainer.batch_size:
                 continue
-            batch = self.trainer.replay_buffer.sample(self.trainer.batch_size)
-            self.trainer.algo.update(*batch)
+            (
+                states,
+                actions,
+                rewards,
+                dones,
+                next_states
+            ) = self.trainer.replay_buffer.sample(self.trainer.batch_size)
+            self.trainer.algo.update(states, actions, rewards, dones, next_states)
 
-            self._log_evaluation(env_step, batch)
+            self._log_evaluation(env_step, rewards)
             self.trainer._save_policy(env_step)
-            self.trainer._log_stdout(env_step, batch)
+            self.trainer._log_stdout(env_step, rewards)
 
         self.trainer.logger.log_scalar("trainer/total_cost", total_cost, self.trainer.num_steps)
 
-    def _log_evaluation(self, env_step: int, batch) -> None:
+    def _log_evaluation(self, env_step: int, rewards: t.Tensor) -> None:
         if env_step % self.trainer.eval_interval == 0:
             eval_metrics = self.evaluate()
             self.trainer.logger.log_scalar(
@@ -54,7 +61,7 @@ class SafeTrainer(TrainerProtocol):
                 "trainer/ep_cost", eval_metrics["cost"], env_step
             )
 
-            self.trainer.logger.log_scalar("trainer/avg_reward", batch[2].mean(), env_step)
+            self.trainer.logger.log_scalar("trainer/avg_reward", rewards.mean().item(), env_step)
             self.trainer.logger.log_scalar(
                 "trainer/buffer_transitions", len(self.trainer.replay_buffer), env_step
             )
@@ -79,7 +86,7 @@ class SafeTrainer(TrainerProtocol):
             terminated, truncated = False, False
 
             while not (terminated or truncated):
-                action = self.trainer.algo.exploit(state)
+                action = self.trainer.algo.actor.exploit(state)
                 state, reward, terminated, truncated, info = env_test.step(action)
                 episode_return += reward
                 episode_cost += info["cost"]

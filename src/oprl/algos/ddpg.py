@@ -65,11 +65,10 @@ class DDPG(OffPolicyAlgorithm):
         reward: t.Tensor,
         done: t.Tensor,
         next_state: t.Tensor,
-    ):
+    ) -> None:
         self._update_critic(state, action, reward, done, next_state)
         self._update_actor(state)
 
-        # Update the frozen target models
         for param, target_param in zip(
             self.critic.parameters(), self.critic_target.parameters()
         ):

@@ -7,6 +7,9 @@ import torch as t
 from oprl.buffers.protocols import ReplayBufferProtocol
 
 
+Transition = tuple[npt.NDArray, npt.NDArray, float, bool, npt.NDArray]
+
+
 @dataclass
 class EpisodicReplayBuffer(ReplayBufferProtocol):
     buffer_size_transitions: int
@@ -75,14 +78,21 @@ class EpisodicReplayBuffer(ReplayBufferProtocol):
         self.check_created()
         return self._tensors["dones"]
 
-    def add_transition(self, state: npt.ArrayLike, action: npt.ArrayLike, reward: float, done: bool, episode_done: bool | None = None):
+    def add_transition(
+            self,
+            state: npt.NDArray,
+            action: npt.NDArray,
+            reward: float,
+            done: bool,
+            episode_done: bool | None = None
+        ) -> None:
         self.states[self._ep_pointer, self.ep_lens[self._ep_pointer]].copy_(
             t.from_numpy(state)
         )
         self.actions[self._ep_pointer, self.ep_lens[self._ep_pointer]].copy_(
             t.from_numpy(action)
         )
-        self.rewards[self._ep_pointer, self.ep_lens[self._ep_pointer]] = float(reward)
+        self.rewards[self._ep_pointer, self.ep_lens[self._ep_pointer]] = reward
         self.dones[self._ep_pointer, self.ep_lens[self._ep_pointer]] = float(done)
         self.ep_lens[self._ep_pointer] += 1
         self._number_transitions = min(self._number_transitions + 1, self.buffer_size_transitions)
@@ -96,22 +106,21 @@ class EpisodicReplayBuffer(ReplayBufferProtocol):
         self._number_transitions -= self.ep_lens[self._ep_pointer]
         self.ep_lens[self._ep_pointer] = 0
 
-    def add_episode(self, episode: list):
+    def add_episode(self, episode: list[Transition]) -> None:
         for s, a, r, d, _ in episode:
             self.add_transition(s, a, r, d, episode_done=d)
         self._inc_episode()
 
-    def _inds_to_episodic(self, inds):
+    def _inds_to_episodic(self, inds: npt.NDArray) -> tuple[npt.NDArray, npt.NDArray]:
         start_inds = np.cumsum([0] + self.ep_lens[: self.episodes_counter - 1])
         end_inds = start_inds + np.array(self.ep_lens[: self.episodes_counter])
         ep_inds = np.argmin(
             inds.reshape(-1, 1) >= np.tile(end_inds, (len(inds), 1)), axis=1
         )
         step_inds = inds - start_inds[ep_inds]
-
         return ep_inds, step_inds
 
-    def sample(self, batch_size):
+    def sample(self, batch_size: int) -> tuple[t.Tensor, t.Tensor, t.Tensor, t.Tensor, t.Tensor]:
         inds = np.random.randint(low=0, high=self._number_transitions, size=batch_size)
         ep_inds, step_inds = self._inds_to_episodic(inds)
 
@@ -124,7 +133,7 @@ class EpisodicReplayBuffer(ReplayBufferProtocol):
         )
 
     @property
-    def last_episode_length(self):
+    def last_episode_length(self) -> int:
         return self.ep_lens[self._ep_pointer]
 
     def __len__(self) -> int:

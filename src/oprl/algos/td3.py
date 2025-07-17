@@ -68,14 +68,20 @@ class TD3(OffPolicyAlgorithm):
         return self
 
 
-    def update(self, state: t.Tensor, action, reward, done, next_state) -> None:
+    def update(
+            self,
+            state: t.Tensor,
+            action: t.Tensor,
+            reward: t.Tensor,
+            done: t.Tensor,
+            next_state: t.Tensor,
+        ) -> None:
         self._update_critic(state, action, reward, done, next_state)
 
         if self.update_step % self.policy_freq == 0:
             self._update_actor(state)
             soft_update(self.critic_target, self.critic, self.tau)
             soft_update(self.actor_target, self.actor, self.tau)
-
         self.update_step += 1
 
     def _update_critic(

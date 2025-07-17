@@ -8,25 +8,25 @@ class EnvProtocol(Protocol):
         ...
 
     def step(
-        self, action: npt.ArrayLike
-    ) -> tuple[npt.ArrayLike, npt.ArrayLike, bool, bool, dict[str, Any]]:
+        self, action: npt.NDArray
+    ) -> tuple[npt.NDArray, float, bool, bool, dict[str, Any]]:
         ...
 
-    def reset(self) -> tuple[npt.ArrayLike, dict[str, Any]]:
+    def reset(self) -> tuple[npt.NDArray, dict[str, Any]]:
         ...
 
-    def sample_action(self) -> npt.ArrayLike:
+    def sample_action(self) -> npt.NDArray:
         ...
 
-    def render(self) -> npt.ArrayLike:
-        ...
-
-    @property
-    def observation_space(self) -> npt.ArrayLike:
+    def render(self) -> npt.NDArray:
         ...
 
     @property
-    def action_space(self) -> npt.ArrayLike:
+    def observation_space(self) -> npt.NDArray:
+        ...
+
+    @property
+    def action_space(self) -> npt.NDArray:
         ...
 
     @property

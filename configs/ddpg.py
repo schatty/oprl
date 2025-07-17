@@ -7,6 +7,7 @@ from oprl.logging import (
     LoggerProtocol,
     make_text_logger_func,
 )
+from oprl.environment.protocols import EnvProtocol
 from oprl.environment import make_env as _make_env
 from oprl.runners.train import run_training
 from oprl.runners.config import CommonParameters
@@ -14,7 +15,7 @@ from oprl.runners.config import CommonParameters
 
 args = parse_args()
 
-def make_env(seed: int):
+def make_env(seed: int) -> EnvProtocol:
     return _make_env(args.env, seed=seed)
 
 
