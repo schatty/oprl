@@ -46,7 +46,7 @@ class BaseTrainer(TrainerProtocol):
             if env_step <= self.start_steps:
                 action = self.env.sample_action()
             else:
-                action = self.algo.explore(state)
+                action = self.algo.actor.explore(state)
             next_state, reward, terminated, truncated, _ = self.env.step(action)
 
             self.replay_buffer.add_transition(
@@ -93,7 +93,7 @@ class BaseTrainer(TrainerProtocol):
     def evaluate(self) -> dict[str, float]:
         returns = []
         for i_ep in range(self.num_eval_episodes):
-            env_test = self.make_env_test(seed=self.seed + i_ep)
+            env_test = self.make_env_test(self.seed + i_ep)
             state, _ = env_test.reset()
 
             episode_return = 0.0
@@ -140,7 +140,7 @@ class BaseTrainer(TrainerProtocol):
     def estimate_true_q(self, eval_episodes: int = 10) -> float:
         qs = []
         for i_eval in range(eval_episodes):
-            env = self.make_env_test(seed=self.seed * 100 + i_eval)
+            env = self.make_env_test(self.seed * 100 + i_eval)
             state, _ = env.reset()
 
             q = 0
@@ -159,7 +159,7 @@ class BaseTrainer(TrainerProtocol):
     def estimate_critic_q(self, num_episodes: int = 10) -> float:
         qs = []
         for i_eval in range(num_episodes):
-            env = self.make_env_test(seed=self.seed * 100 + i_eval)
+            env = self.make_env_test(self.seed * 100 + i_eval)
             state, _ = env.reset()
             action = self.algo.actor.exploit(state)
 

@@ -11,7 +11,7 @@ from torch.nn.functional import logsigmoid
 LOG_STD_MIN_MAX: Final[tuple[float, float]] = (-20, 2)
 
 
-def initialize_weight_orthogonal(m: nn.Module, gain: float = nn.init.calculate_gain("relu")):
+def initialize_weight_orthogonal(m: nn.Module, gain: int = nn.init.calculate_gain("relu")):
     if isinstance(m, nn.Linear):
         nn.init.orthogonal_(m.weight.data, gain)
         m.bias.data.fill_(0.0)
@@ -194,7 +194,7 @@ class GaussianActor(nn.Module):
         return action
 
 
-class TanhNormal(Distribution):
+class TanhNormal:
     def __init__(self, normal_mean: t.Tensor, normal_std: t.Tensor, device: str) -> None:
         super().__init__()
         self.normal_mean = normal_mean

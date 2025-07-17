@@ -59,7 +59,7 @@ def _run_training_func(
         seed: int,
 ) -> None:
     set_seed(seed)
-    env = make_env(seed=seed)
+    env = make_env(seed)
     replay_buffer = make_replay_buffer()
     logger = make_logger(seed)
     algo = make_algo(logger)

@@ -15,6 +15,8 @@ class PolicyProtocol(Protocol):
 
     def __call__(*args, **kwargs) -> t.Tensor: ...
 
+    def state_dict(self) -> dict: ...
+
 
 class AlgorithmProtocol(Protocol):
     actor: PolicyProtocol
