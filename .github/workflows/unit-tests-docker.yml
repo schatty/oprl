@@ -16,7 +16,7 @@ jobs:
 
     - name: Ruff
       run: |
-        docker run --rm sh -c "
+        docker run --rm oprl sh -c "
           uv run ruff check src
         "
     
