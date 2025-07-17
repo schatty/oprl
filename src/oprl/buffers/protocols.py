@@ -1,8 +1,9 @@
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 import torch as t
 
 
+@runtime_checkable
 class ReplayBufferProtocol(Protocol):
     episodes_counter: int
     _created: bool

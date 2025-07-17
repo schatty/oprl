@@ -5,11 +5,12 @@ import logging
 from datetime import datetime
 import shutil
 from abc import ABC, abstractmethod
-from typing import Protocol, Callable
+from typing import Protocol, Callable, runtime_checkable
 
 from torch.utils.tensorboard.writer import SummaryWriter
 
 
+@runtime_checkable
 class LoggerProtocol(Protocol):
     log_dir: Path
 
@@ -26,7 +27,7 @@ def get_logs_path(logdir: str, algo: str, env: str, seed: int) -> Path:
     return log_dir
 
 
-def create_stdout_logger(name: str | None = None):
+def create_stdout_logger(name: str = None):
     if name is None:
         import inspect
         frame = inspect.currentframe().f_back
