@@ -84,7 +84,7 @@ def run_policy_update_worker(
                 policy=algo.actor,
                 save_path=algo.logger.log_dir / "weights" / f"epoch_{i_epoch}.w"
             )
-            logger.info(f"Weights saved.")
+            logger.info("Weights saved.")
 
     logger.info("Update by policy update worker done.")
 
