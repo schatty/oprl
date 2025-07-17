@@ -5,7 +5,7 @@ on:
 
 jobs:
   unit_tests:
-    name: Unit Tests
+    name: Unit Tests - Coverage - MyPy
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
@@ -13,14 +13,26 @@ jobs:
     
     - name: Build Docker image
       run: docker build -t oprl .
+
+    - name: Ruff
+      run: |
+        docker run --rm oprl sh -c "
+          uv run ruff check src
+        "
     
     - name: Unit Tests
       run: docker run --rm oprl
 
+    - name: MyPy
+      run: |
+        docker run --rm oprl sh -c "
+          uv run mypy --ignore-missing-imports  --python-version 3.10 src/oprl/trainers src/oprl/buffers
+        "
+
     - name: Extract coverage
       run: |
         docker run --rm -v $(pwd):/host oprl sh -c "
-          pytest tests/functional --cov=oprl --cov-report=xml &&
+          uv run pytest tests/functional --cov=oprl --cov-report=xml &&
           cp coverage.xml /host/
         "
     

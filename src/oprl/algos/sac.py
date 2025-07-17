@@ -1,20 +1,21 @@
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
-import numpy.typing as npt
 import torch as t
 from torch import nn
 from torch.optim import Adam
 
-from oprl.algos import OffPolicyAlgorithm
-from oprl.algos.nn import DoubleCritic, GaussianActor
-from oprl.algos.utils import disable_gradient, soft_update
-from oprl.utils.logger import Logger, StdLogger
+from oprl.algos.protocols import PolicyProtocol
+from oprl.algos.base_algorithm import OffPolicyAlgorithm
+from oprl.algos.nn_models import DoubleCritic, GaussianActor
+from oprl.algos.nn_functions import disable_gradient, soft_update
+from oprl.logging import LoggerProtocol
 
 
 @dataclass
 class SAC(OffPolicyAlgorithm):
+    logger: LoggerProtocol
     state_dim: int
     action_dim: int
     batch_size: int = 256
@@ -27,7 +28,16 @@ class SAC(OffPolicyAlgorithm):
     target_update_coef: float = 5e-3
     device: str = "cpu"
     log_every: int = 5000
-    logger: Logger = StdLogger()
+ 
+    actor: PolicyProtocol = field(init=False)
+    actor_target: PolicyProtocol = field(init=False)
+    optim_actor: t.optim.Optimizer = field(init=False)
+    critic: nn.Module = field(init=False)
+    critic_target: nn.Module = field(init=False)
+    optim_critic: t.optim.Optimizer = field(init=False)
+    alpha: float = field(init=False)
+    update_step: int = 0
+    _created: bool = False
 
     def create(self) -> "SAC":
         self.actor = GaussianActor(
@@ -35,6 +45,7 @@ class SAC(OffPolicyAlgorithm):
             action_dim=self.action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(inplace=True),
+            device=self.device,
         ).to(self.device)
 
         self.critic = DoubleCritic(
@@ -50,15 +61,15 @@ class SAC(OffPolicyAlgorithm):
         self.optim_actor = Adam(self.actor.parameters(), lr=self.lr_actor)
         self.optim_critic = Adam(self.critic.parameters(), lr=self.lr_critic)
 
-        self._alpha = self.alpha_init
+        self.alpha = self.alpha_init
         if self.tune_alpha:
             self.log_alpha = t.tensor(
-                np.log(self._alpha), device=self.device, requires_grad=True
+                np.log(self.alpha), device=self.device, requires_grad=True
             )
             self.optim_alpha = t.optim.Adam([self.log_alpha], lr=self.lr_alpha)
             self.target_entropy = -float(self.action_dim)
-        self.update_step = 0
 
+        self._created = True
         return self
 
     def update(
@@ -72,7 +83,6 @@ class SAC(OffPolicyAlgorithm):
         self.update_critic(state, action, reward, done, next_state)
         self.update_actor(state)
         soft_update(self.critic_target, self.critic, self.target_update_coef)
-
         self.update_step += 1
 
     def update_critic(
@@ -87,7 +97,7 @@ class SAC(OffPolicyAlgorithm):
         with t.no_grad():
             next_actions, log_pis = self.actor(next_states)
             q1_next, q2_next = self.critic_target(next_states, next_actions)
-            q_next = t.min(q1_next, q2_next) - self._alpha * log_pis
+            q_next = t.min(q1_next, q2_next) - self.alpha * log_pis
 
         q_target = rewards + (1.0 - dones) * self.gamma * q_next
 
@@ -113,7 +123,7 @@ class SAC(OffPolicyAlgorithm):
     def update_actor(self, state: t.Tensor) -> None:
         actions, log_pi = self.actor(state)
         qs1, qs2 = self.critic(state, actions)
-        loss_actor = self._alpha * log_pi.mean() - t.min(qs1, qs2).mean()
+        loss_actor = self.alpha * log_pi.mean() - t.min(qs1, qs2).mean()
 
         self.optim_actor.zero_grad()
         loss_actor.backward()
@@ -128,7 +138,7 @@ class SAC(OffPolicyAlgorithm):
             loss_alpha.backward()
             self.optim_alpha.step()
             with t.no_grad():
-                self._alpha = self.log_alpha.exp().item()
+                self.alpha = self.log_alpha.exp().item()
 
         if self.update_step % self.log_every == 0:
             if self.tune_alpha:
@@ -138,20 +148,8 @@ class SAC(OffPolicyAlgorithm):
             self.logger.log_scalars(
                 {
                     "algo/loss_actor": loss_actor.item(),
-                    "algo/alpha": self._alpha,
+                    "algo/alpha": self.alpha,
                     "algo/log_pi": log_pi.cpu().mean(),
                 },
                 self.update_step,
             )
-
-    def explore(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        state = t.tensor(state, device=self.device).unsqueeze_(0)
-        with t.no_grad():
-            action, _ = self.actor(state)
-        return action.cpu().numpy()[0]
-
-    def exploit(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        self.actor.eval()
-        action = self.explore(state)
-        self.actor.train()
-        return action

@@ -1,20 +1,20 @@
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-import numpy as np
-import numpy.typing as npt
 import torch as t
 from torch import nn
 from torch.optim import Adam
 
-from oprl.algos import OffPolicyAlgorithm
-from oprl.algos.nn import DeterministicPolicy, DoubleCritic
-from oprl.algos.utils import disable_gradient, soft_update
-from oprl.utils.logger import Logger, StdLogger
+from oprl.algos.protocols import PolicyProtocol
+from oprl.algos.base_algorithm import OffPolicyAlgorithm
+from oprl.algos.nn_models import DeterministicPolicy, DoubleCritic
+from oprl.algos.nn_functions import disable_gradient, soft_update
+from oprl.logging import LoggerProtocol
 
 
 @dataclass
 class TD3(OffPolicyAlgorithm):
+    logger: LoggerProtocol
     state_dim: int
     action_dim: int
     batch_size: int = 256
@@ -22,15 +22,22 @@ class TD3(OffPolicyAlgorithm):
     expl_noise: float = 0.1
     noise_clip: float = 0.5
     policy_freq: int = 2
-    discount: float = 0.99
+    gamma: float = 0.99
     lr_actor: float = 3e-4
     lr_critic: float = 3e-4
     max_action: float = 1.0
     tau: float = 5e-3
     log_every: int = 5000
     device: str = "cpu"
-    logger: Logger = StdLogger()
+
+    actor: PolicyProtocol = field(init=False)
+    actor_target: PolicyProtocol = field(init=False)
+    optim_actor: t.optim.Optimizer = field(init=False)
+    critic: nn.Module = field(init=False)
+    critic_target: nn.Module = field(init=False)
+    optim_critic: t.optim.Optimizer = field(init=False)
     update_step: int = 0
+    _created: bool = False
 
     def create(self) -> "TD3":
         self.actor = DeterministicPolicy(
@@ -38,6 +45,8 @@ class TD3(OffPolicyAlgorithm):
             action_dim=self.action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(inplace=True),
+            expl_noise=self.expl_noise,
+            device=self.device,
         ).to(self.device)
         self.actor_target = deepcopy(self.actor).to(self.device).eval()
         disable_gradient(self.actor_target)
@@ -54,34 +63,25 @@ class TD3(OffPolicyAlgorithm):
         disable_gradient(self.critic_target)
 
         self.optim_critic = Adam(self.critic.parameters(), lr=self.lr_critic)
+
+        self._created = True
         return self
 
-    def exploit(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        state = t.tensor(state, device=self.device).unsqueeze_(0)
-        with t.no_grad():
-            action = self.actor(state)
-        return action.cpu().numpy().flatten()
 
-    def explore(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        state = t.tensor(state, device=self.device).unsqueeze_(0)
-        noise = (t.randn(self.action_dim) * self.max_action * self.expl_noise).to(
-            self.device
-        )
-
-        with t.no_grad():
-            action = self.actor(state) + noise
-
-        a = action.cpu().numpy()[0]
-        return np.clip(a, -self.max_action, self.max_action)
-
-    def update(self, state: t.Tensor, action, reward, done, next_state) -> None:
+    def update(
+            self,
+            state: t.Tensor,
+            action: t.Tensor,
+            reward: t.Tensor,
+            done: t.Tensor,
+            next_state: t.Tensor,
+        ) -> None:
         self._update_critic(state, action, reward, done, next_state)
 
         if self.update_step % self.policy_freq == 0:
             self._update_actor(state)
             soft_update(self.critic_target, self.critic, self.tau)
             soft_update(self.actor_target, self.actor, self.tau)
-
         self.update_step += 1
 
     def _update_critic(
@@ -105,7 +105,7 @@ class TD3(OffPolicyAlgorithm):
             q1_next, q2_next = self.critic_target(next_state, next_actions)
             q_next = t.min(q1_next, q2_next)
 
-        q_target = reward + (1.0 - done) * self.discount * q_next
+        q_target = reward + (1.0 - done) * self.gamma * q_next
 
         td_error1 = (q1 - q_target).pow(2).mean()
         td_error2 = (q2 - q_target).pow(2).mean()

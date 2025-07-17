@@ -1,26 +1,22 @@
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
-import numpy.typing as npt
 import torch as t
 import torch.nn as nn
 
-from oprl.algos import OffPolicyAlgorithm
-from oprl.algos.nn import MLP, GaussianActor
-from oprl.utils.logger import Logger, StdLogger
+from oprl.algos.protocols import PolicyProtocol
+from oprl.algos.base_algorithm import OffPolicyAlgorithm
+from oprl.algos.nn_models import MLP, GaussianActor
+from oprl.logging import LoggerProtocol
 
 
 def quantile_huber_loss_f(
     quantiles: t.Tensor, samples: t.Tensor, device: str
 ) -> t.Tensor:
     """
-    Args:
-        quantiles: [batch, n_nets, n_quantiles].
-        samples: [batch, n_nets * n_quantiles - top_quantiles_to_drop].
-
-    Returns:
-        loss as a torch value.
+    quantiles: [batch, n_nets, n_quantiles].
+    samples: [batch, n_nets * n_quantiles - top_quantiles_to_drop].
     """
     pairwise_delta = (
         samples[:, None, None, :] - quantiles[:, :, :, None]
@@ -41,7 +37,7 @@ def quantile_huber_loss_f(
 
 
 class QuantileQritic(nn.Module):
-    def __init__(self, state_dim: int, action_dim: int, n_quantiles: int, n_nets: int):
+    def __init__(self, state_dim: int, action_dim: int, n_quantiles: int, n_nets: int) -> None:
         super().__init__()
         self.nets = []
         self.n_quantiles = n_quantiles
@@ -64,17 +60,31 @@ class QuantileQritic(nn.Module):
 
 @dataclass
 class TQC(OffPolicyAlgorithm):
+    logger: LoggerProtocol
     state_dim: int
     action_dim: int
-    discount: float = 0.99
+    gamma: float = 0.99
+    lr_actor = 3e-4
+    lr_critic = 3e-4
+    lr_alpha = 3e-4
     tau: float = 0.005
     top_quantiles_to_drop: int = 2
     n_quantiles: int = 25
     n_nets: int = 5
     log_every: int = 5000
     device: str = "cpu"
-    logger: Logger = StdLogger()
-    update_step = 0
+
+    actor: PolicyProtocol = field(init=False)
+    actor_target: PolicyProtocol = field(init=False)
+    actor_optimizer: t.optim.Optimizer = field(init=False)
+    critic: QuantileQritic = field(init=False)
+    critic_target: QuantileQritic = field(init=False)
+    critic_optimizer: t.optim.Optimizer = field(init=False)
+    target_entropy: float = field(init=False)
+    alpha_optimizer: t.optim.Optimizer = field(init=False)
+    quantiles_total: int = field(init=False)
+    update_step: int = 0
+    _created: bool = False
 
     def create(self) -> "TQC":
         self.target_entropy = -np.prod(self.action_dim).item()
@@ -83,6 +93,7 @@ class TQC(OffPolicyAlgorithm):
             self.action_dim,
             hidden_units=(256, 256),
             hidden_activation=nn.ReLU(),
+            device=self.device,
         ).to(self.device)
         self.critic = QuantileQritic(
             self.state_dim,
@@ -92,13 +103,14 @@ class TQC(OffPolicyAlgorithm):
         ).to(self.device)
         self.critic_target = copy.deepcopy(self.critic)
         self.log_alpha = t.tensor(np.log(0.2), requires_grad=True, device=self.device)
-        self._quantiles_total = self.critic.n_quantiles * self.critic.n_nets
+        self.quantiles_total = self.critic.n_quantiles * self.critic.n_nets
 
         # TODO: check hyperparams
-        self.actor_optimizer = t.optim.Adam(self.actor.parameters(), lr=3e-4)
-        self.critic_optimizer = t.optim.Adam(self.critic.parameters(), lr=3e-4)
-        self.alpha_optimizer = t.optim.Adam([self.log_alpha], lr=3e-4)
+        self.actor_optimizer = t.optim.Adam(self.actor.parameters(), lr=self.lr_actor)
+        self.critic_optimizer = t.optim.Adam(self.critic.parameters(), lr=self.lr_critic)
+        self.alpha_optimizer = t.optim.Adam([self.log_alpha], lr=self.lr_alpha)
 
+        self._created = True
         return self
 
     def update(
@@ -124,11 +136,11 @@ class TQC(OffPolicyAlgorithm):
             )  # batch x nets x quantiles
             sorted_z, _ = t.sort(next_z.reshape(batch_size, -1))
             sorted_z_part = sorted_z[
-                :, : self._quantiles_total - self.top_quantiles_to_drop
+                :, : self.quantiles_total - self.top_quantiles_to_drop
             ]
 
             # compute target
-            target = reward + (1 - done) * self.discount * (
+            target = reward + (1 - done) * self.gamma * (
                 sorted_z_part - alpha * next_log_pi
             )
 
@@ -175,15 +187,3 @@ class TQC(OffPolicyAlgorithm):
             )
 
         self.update_step += 1
-
-    def explore(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        state = t.tensor(state, device=self.device).unsqueeze_(0)
-        with t.no_grad():
-            action, _ = self.actor(state)
-        return action.cpu().numpy()[0]
-
-    def exploit(self, state: npt.ArrayLike) -> npt.ArrayLike:
-        self.actor.eval()
-        action = self.explore(state)
-        self.actor.train()
-        return action
