@@ -1,14 +1,12 @@
 import os
-import argparse
 import logging
-from multiprocessing import Process
 
 import torch.nn as nn
 
 from oprl.algos.ddpg import DDPG
 from oprl.algos.nn_models import DeterministicPolicy
-from oprl.distrib.distrib_runner import env_worker, policy_update_worker
-
+from oprl.algos.protocols import AlgorithmProtocol, PolicyProtocol
+from oprl.buffers.protocols import ReplayBufferProtocol
 from oprl.environment import make_env as _make_env
 from oprl.buffers.episodic_buffer import EpisodicReplayBuffer
 from oprl.logging import (
@@ -17,15 +15,21 @@ from oprl.logging import (
     get_logs_path,
 )
 from oprl.parse_args import parse_args_distrib
+from oprl.runners.config import DistribConfig
+from oprl.runners.train_distrib import run_distrib_training
+from oprl.distrib.env_worker import run_env_worker
+from oprl.distrib.policy_update_worker import run_policy_update_worker
 
 
+config = DistribConfig(
+    batch_size=128,
+    num_env_workers=4,
+    episodes_per_worker=100,
+    warmup_epochs=16,
+    episode_length=1000,
+    learner_num_waits=10,
+)
 
-# -------- Distrib params -----------
-
-ENV_WORKERS = 4
-EPISODES_PER_WORKER = 100  # Number of episodes each env worker would perform
-
-# -----------------------------------
 
 args = parse_args_distrib()
 
@@ -39,7 +43,7 @@ ACTION_DIM = env.action_space.shape[0]
 logging.info(f"Env state {STATE_DIM}\tEnv action {ACTION_DIM}")
 
 
-def make_logger():
+def make_logger() -> LoggerProtocol:
     logs_root = os.environ.get("OPRL_LOGS", "logs")
     log_dir = get_logs_path(logdir=logs_root, algo="DistribDDPG", env=args.env, seed=0)
     logger = FileTxtLogger(log_dir)
@@ -47,7 +51,7 @@ def make_logger():
     return logger
 
 
-def make_policy():
+def make_policy() -> PolicyProtocol:
     return DeterministicPolicy(
         state_dim=STATE_DIM,
         action_dim=ACTION_DIM,
@@ -57,7 +61,7 @@ def make_policy():
     )
 
 
-def make_buffer():
+def make_replay_buffer() -> ReplayBufferProtocol:
     return EpisodicReplayBuffer(
         buffer_size_transitions=int(1_000_000),
         state_dim=STATE_DIM,
@@ -66,7 +70,7 @@ def make_buffer():
     ).create()
 
 
-def make_algo(logger: LoggerProtocol):
+def make_algo(logger: LoggerProtocol) -> AlgorithmProtocol:
     return DDPG(
         logger=logger,
         state_dim=STATE_DIM,
@@ -76,21 +80,13 @@ def make_algo(logger: LoggerProtocol):
 
 
 if __name__ == "__main__":
-    processes = []
-
-    for i_env in range(ENV_WORKERS):
-        processes.append(
-            Process(target=env_worker, args=(make_env, make_policy, EPISODES_PER_WORKER, i_env))
-        )
-    processes.append(
-        Process(
-            target=policy_update_worker,
-            args=(make_algo, make_env, make_buffer, make_logger, ENV_WORKERS),
-        )
+    run_distrib_training(
+        run_env_worker=run_env_worker,
+        run_policy_update_worker=run_policy_update_worker,
+        make_env=make_env,
+        make_algo=make_algo,
+        make_policy=make_policy,
+        make_replay_buffer=make_replay_buffer,
+        make_logger=make_logger,
+        config=config,
     )
-
-    for p in processes:
-        p.start()
-    for p in processes:
-        p.join()
-    logging.info("Training OK.")

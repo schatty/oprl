@@ -9,3 +9,14 @@ class CommonParameters(BaseSettings):
     estimate_q_every: int = 5000 
     log_every: int = 2500
     device: str = "cpu"
+
+
+class DistribConfig(BaseSettings):
+    batch_size: int = 128
+    num_env_workers: int = 4
+    episodes_per_worker: int = 100
+    warmup_epochs: int = 16
+    episode_length: int = 1000
+    learner_num_waits: int = 10
+    warmup_env_steps: int = 1000
+    

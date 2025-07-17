@@ -1,9 +1,11 @@
-from typing import Protocol
+from typing import Protocol, Any
 
 import numpy.typing as npt
 
 import torch as t
 import torch.nn as nn
+
+from oprl.logging import LoggerProtocol
 
 
 class PolicyProtocol(Protocol):
@@ -17,6 +19,7 @@ class PolicyProtocol(Protocol):
 class AlgorithmProtocol(Protocol):
     actor: PolicyProtocol
     critic: nn.Module
+    logger: LoggerProtocol
     _created: bool
 
     def create(self) -> "AlgorithmProtocol": ...
@@ -32,4 +35,6 @@ class AlgorithmProtocol(Protocol):
         next_state: t.Tensor
     ) -> None: ...
 
+    def get_policy_state_dict(self) -> dict[str, Any]:
+        return self.actor.state_dict()
 

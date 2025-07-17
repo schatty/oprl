@@ -1,22 +1,4 @@
-import pickle
-import time
-from itertools import count
-from pathlib import Path
-from typing import Callable
-
-import numpy as np
-import torch as t
-import torch.nn as nn
 import pika
-
-from oprl.algos.protocols import AlgorithmProtocol, PolicyProtocol
-from oprl.environment.protocols import EnvProtocol
-from oprl.logging import create_stdout_logger, LoggerProtocol
-from oprl.runners.config import DistribConfig
-from oprl.buffers.protocols import ReplayBufferProtocol
-
-
-logger = create_stdout_logger()
 
 
 class Queue:
@@ -35,11 +17,4 @@ class Queue:
             self.channel.basic_ack(method_frame.delivery_tag)
             return body
         return None
-
-
-
-
-
-
-
 
