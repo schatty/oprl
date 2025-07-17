@@ -20,7 +20,7 @@ jobs:
     - name: Extract coverage
       run: |
         docker run --rm -v $(pwd):/host oprl sh -c "
-          pytest tests/functional --cov=oprl --cov-report=xml &&
+          uv run pytest tests/functional --cov=oprl --cov-report=xml &&
           cp coverage.xml /host/
         "
     
