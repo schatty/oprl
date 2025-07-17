@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 from oprl.environment import EnvProtocol, DMControlEnv, SafetyGym
+from oprl.environment.gymnasium import Gymnasium
 
 
 
@@ -33,6 +34,24 @@ ENV_MAPPER["dm_control"] = set(
         "walker-run",
     ]
 )
+
+
+ENV_MAPPER["gymnasium"] = set(
+    [
+        "Ant-v4",
+        "Hopper-v4",
+        "HalfCheetah-v4",
+        "HumanoidStandup-v4",
+        "Humanoid-v4",
+        "InvertedDoublePendulum-v4",
+        "InvertedPendulum-v4",
+        "Pusher-v4",
+        "Reacher-v4",
+        "Swimmer-v4",
+        "Walker2d-v4",
+    ]
+)
+
 
 ENV_MAPPER["safety_gymnasium"] = set(
     [
@@ -79,4 +98,6 @@ def make_env(name: str, seed: int) -> EnvProtocol:
                 return DMControlEnv(name, seed=seed)
             elif env_type == "safety_gymnasium":
                 return SafetyGym(name, seed=seed)
+            elif env_type == "gymnasium":
+                return Gymnasium(name, seed=seed)
     raise ValueError(f"Unsupported environment: {name}")

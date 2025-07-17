@@ -31,6 +31,21 @@ dm_control_envs: list[str] = [
 ]
 
 
+gymnasium_envs: list[str] = [
+    "Ant-v4",
+    "Hopper-v4",
+    "HalfCheetah-v4",
+    "HumanoidStandup-v4",
+    "Humanoid-v4",
+    "InvertedDoublePendulum-v4",
+    "InvertedPendulum-v4",
+    "Pusher-v4",
+    "Reacher-v4",
+    "Swimmer-v4",
+    "Walker2d-v4",
+]
+
+
 safety_envs: list[str] = [
     "SafetyPointGoal1-v0",
     "SafetyPointButton1-v0",
@@ -39,7 +54,7 @@ safety_envs: list[str] = [
 ]
 
 
-env_names: list[str] = dm_control_envs + safety_envs
+env_names: list[str] = dm_control_envs + safety_envs + gymnasium_envs
 
 
 @pytest.mark.parametrize("env_name", env_names)
