@@ -39,4 +39,4 @@ class Gymnasium(EnvProtocol):
 
     @property
     def env_family(self) -> str:
-        return "safety_gymnasium"
+        return "gymnasium"

@@ -77,7 +77,7 @@ def _run_training_func(
         seed=seed,
         logger=logger,
     )
-    if env.env_family == "dm_control":
+    if env.env_family in ["dm_control", "gymnasium"]:
         trainer = base_trainer
     elif env.env_family == "safety_gymnasium":
         trainer = SafeTrainer(trainer=base_trainer)
