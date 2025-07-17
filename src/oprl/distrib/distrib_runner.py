@@ -1,12 +1,17 @@
-import logging
 import pickle
 import time
 from itertools import count
-from multiprocessing import Process
+from pathlib import Path
 
 import numpy as np
+import torch as t
+import torch.nn as nn
 import pika
-import torch
+
+from oprl.logging import create_stdout_logger
+
+
+logger = create_stdout_logger()
 
 
 class Queue:
@@ -30,23 +35,22 @@ class Queue:
 
 def env_worker(make_env, make_policy, n_episodes, id_worker):
     env = make_env(seed=0)
-    logging.info("Env created.")
+    logger.info("Env created.")
 
     policy = make_policy()
-    logging.info("Policy created.")
+    logger.info("Policy created.")
 
     q_env = Queue(f"env_{id_worker}")
     q_policy = Queue(f"policy_{id_worker}")
-    logging.info("Queue created.")
-
-    episodes = []
+    logger.info("Queue created.")
 
     total_env_step = 0
     # TODO: Move parameter to config
     start_steps = 1000
     for i_ep in range(n_episodes):
+        print("Running episode: ", i_ep)
         if i_ep % 10 == 0:
-            logging.info(f"AGENT {id_worker} EPISODE {i_ep}")
+            logger.info(f"AGENT {id_worker} EPISODE {i_ep}")
 
         episode = []
         state, _ = env.reset()
@@ -70,36 +74,45 @@ def env_worker(make_env, make_policy, n_episodes, id_worker):
         while True:
             data = q_policy.pop()
             if data is None:
-                logging.info("Waiting for the policy..")
+                logger.info("Waiting for the policy..")
                 time.sleep(2.0)
                 continue
 
             policy.load_state_dict(pickle.loads(data))
             break
 
-    logging.info("Episode by env worker is done.")
+    logger.info("Episode by env worker is done.")
 
 
-def policy_update_worker(make_algo, make_env_test, make_buffer, n_workers):
-    algo = make_algo()
-    logging.info("Algo created.")
+def save_policy(policy: nn.Module, save_path: Path):
+    save_path.parents[0].mkdir(exist_ok=True)
+    t.save(
+        policy,
+        save_path
+    )
+
+
+def policy_update_worker(make_algo, make_env_test, make_buffer, make_logger, n_workers):
+    scalar_logger = make_logger()
+    algo = make_algo(scalar_logger)
+    logger.info("Algo created.")
     buffer = make_buffer()
-    logging.info("Buffer created.")
+    logger.info("Buffer created.")
 
     q_envs = []
     q_policies = []
     for i_env in range(n_workers):
         q_envs.append(Queue(f"env_{i_env}"))
         q_policies.append(Queue(f"policy_{i_env}"))
-    logging.info("Learner queue created.")
+    logger.info("Learner queue created.")
 
     batch_size = 128
 
-    logging.info("Warming up the learner...")
+    logger.info("Warming up the learner...")
     time.sleep(2.0)
 
     for i_epoch in count(0):
-        logging.info(f"Epoch: {i_epoch}")
+        logger.info(f"Epoch: {i_epoch}")
         n_waits = 0
         for i_env in range(n_workers):
             while True:
@@ -109,12 +122,12 @@ def policy_update_worker(make_algo, make_env_test, make_buffer, n_workers):
                     buffer.add_episode(episode)
                     break
                 else:
-                    logging.info("Waiting for the env data...")
+                    logger.info("Waiting for the env data...")
                     # TODO: not optimal wait for each queue
                     time.sleep(1)
                     n_waits += 1
                     if n_waits == 10:
-                        logging.info("Learner tired to wait, exiting...")
+                        logger.info("Learner tired to wait, exiting...")
                         return
                     continue
 
@@ -124,7 +137,7 @@ def policy_update_worker(make_algo, make_env_test, make_buffer, n_workers):
                 batch = buffer.sample(batch_size)
                 algo.update(*batch)
                 if i % int(1000) == 0:
-                    logging.info(f"\tUpdating {i}")
+                    logger.info(f"\tUpdating {i}")
 
         policy_state_dict = algo.get_policy_state_dict()
 
@@ -132,11 +145,19 @@ def policy_update_worker(make_algo, make_env_test, make_buffer, n_workers):
         for i_env in range(n_workers):
             q_policies[i_env].push(policy_serialized)
 
-        if True:
+ 
+        if i_epoch > 0 and i_epoch % 10 == 0:
             mean_reward = evaluate(algo, make_env_test)
+            logger.info(f"Evaluating policy [epoch {i_epoch}]: {mean_reward}")
             algo.logger.log_scalar("trainer/ep_reward", mean_reward, i_epoch)
 
-    logging.info("Update by policy update worker done.")
+            save_policy(
+                policy=algo.actor,
+                save_path=algo.logger.log_dir / "weights" / f"epoch_{i_epoch}.w"
+            )
+            logger.info(f"Weights saved.")
+
+    logger.info("Update by policy update worker done.")
 
 
 def evaluate(algo, make_env_test, num_eval_episodes: int = 5, seed: int = 0):

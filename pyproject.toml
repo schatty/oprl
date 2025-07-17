@@ -24,6 +24,7 @@ dependencies = [
     "dm-control==1.0.11",
     "mujoco==2.3.3",
     "numpy==1.26.4",
+    "pika==1.3.2",
     "pydantic_settings==2.10.1",
 ]
 

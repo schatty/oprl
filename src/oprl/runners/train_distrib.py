@@ -4,11 +4,17 @@ from datetime import datetime
 from multiprocessing import Process
 
 import torch.nn as nn
-from algos.ddpg import DDPG, DeterministicPolicy
+
+from oprl.algos.ddpg import DDPG
+from oprl.algos.nn_models import DeterministicPolicy
+print("Imports ok.")
+
+"""
 from distrib.distrib_runner import env_worker, policy_update_worker
 from env import DMControlEnv, make_env
 from trainers.buffers.episodic_buffer import EpisodicReplayBuffer
 from utils.logger import Logger
+
 
 
 
@@ -103,3 +109,4 @@ if __name__ == "__main__":
         p.join()
 
     print("OK.")
+"""
