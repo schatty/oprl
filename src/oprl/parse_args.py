@@ -1,7 +1,4 @@
 import argparse
-import logging
-import os
-from datetime import datetime
 
 
 def parse_args() -> argparse.Namespace:
@@ -28,8 +25,14 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def create_logdir(logdir: str, algo: str, env: str, seed: int) -> str:
-    dt = datetime.now().strftime("%Y_%m_%d_%Hh%Mm%Ss")
-    log_dir = os.path.join(logdir, algo, f"{algo}-env_{env}-seed_{seed}-{dt}")
-    logging.info(f"LOGDIR: {log_dir}")
-    return log_dir
+def parse_args_distrib():
+    parser = argparse.ArgumentParser(description="Run distrib training")
+    parser.add_argument("--config", type=str, help="Path to the config file.")
+    parser.add_argument(
+        "--env", type=str, default="cartpole-balance", help="Name of the environment."
+    )
+    parser.add_argument(
+        "--device", type=str, default="cpu", help="Device to perform training on."
+    )
+    parser.add_argument("--seed", type=int, default=0, help="Random seed")
+    return parser.parse_args()

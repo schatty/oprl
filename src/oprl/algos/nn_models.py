@@ -1,13 +1,27 @@
+from typing import Final
+
 import numpy as np
 import numpy.typing as npt
 import torch as t
 import torch.nn as nn
-from torch.distributions import Distribution, Normal
+from torch.distributions import Normal
 from torch.nn.functional import logsigmoid
 
-from oprl.algos.utils import initialize_weight
 
-LOG_STD_MIN_MAX = (-20, 2)
+LOG_STD_MIN_MAX: Final[tuple[float, float]] = (-20, 2)
+
+
+def initialize_weight_orthogonal(m: nn.Module, gain: int = nn.init.calculate_gain("relu")):
+    if isinstance(m, nn.Linear):
+        nn.init.orthogonal_(m.weight.data, gain)
+        m.bias.data.fill_(0.0)
+    # delta-orthogonal initialization.
+    elif isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+        assert m.weight.size(2) == m.weight.size(3)
+        m.weight.data.fill_(0.0)
+        m.bias.data.fill_(0.0)
+        mid = m.weight.size(2) // 2
+        nn.init.orthogonal_(m.weight.data[:, :, mid, mid], gain)
 
 
 class Critic(nn.Module):
@@ -17,9 +31,8 @@ class Critic(nn.Module):
         action_dim: int,
         hidden_units: tuple[int, ...] = (256, 256),
         hidden_activation: nn.Module = nn.ReLU(inplace=True),
-    ):
+    ) -> None:
         super().__init__()
-
         self.q1 = MLP(
             input_dim=state_dim + action_dim,
             output_dim=1,
@@ -27,7 +40,7 @@ class Critic(nn.Module):
             hidden_activation=hidden_activation,
         )
 
-    def forward(self, states: t.Tensor, actions: t.Tensor):
+    def forward(self, states: t.Tensor, actions: t.Tensor) -> t.Tensor:
         x = t.cat([states, actions], dim=-1)
         return self.q1(x)
 
@@ -45,7 +58,6 @@ class DoubleCritic(nn.Module):
         hidden_activation: nn.Module = nn.ReLU(inplace=True),
     ):
         super().__init__()
-
         self.q1 = MLP(
             input_dim=state_dim + action_dim,
             output_dim=1,
@@ -101,7 +113,7 @@ class DeterministicPolicy(nn.Module):
         state_dim: int,
         action_dim: int,
         hidden_units: tuple[int, ...] = (256, 256),
-        hidden_activation=nn.ReLU(inplace=True),
+        hidden_activation: nn.Module = nn.ReLU(inplace=True),
         max_action: float = 1.0,
         expl_noise: float = 0.1,
         device: str = "cpu",
@@ -113,7 +125,7 @@ class DeterministicPolicy(nn.Module):
             output_dim=action_dim,
             hidden_units=hidden_units,
             hidden_activation=hidden_activation,
-        ).apply(initialize_weight)
+        ).apply(initialize_weight_orthogonal)
 
         self._device = device
         self._action_shape = action_dim
@@ -123,28 +135,36 @@ class DeterministicPolicy(nn.Module):
     def forward(self, states: t.Tensor) -> t.Tensor:
         return t.tanh(self.mlp(states))
 
-    def exploit(self, state: npt.ArrayLike) -> npt.NDArray:
-        state = t.tensor(state).unsqueeze_(0).to(self._device)
-        return self.forward(state).cpu().numpy().flatten()
-
-    def explore(self, state: npt.ArrayLike) -> npt.NDArray:
-        state = t.tensor(state, device=self._device).unsqueeze_(0)
-
+    def exploit(self, state: npt.NDArray) -> npt.NDArray:
+        state_tensor = t.tensor(state).unsqueeze_(0).to(self._device)
         with t.no_grad():
-            noise = (t.randn(self._action_shape) * self._expl_noise).to(self._device)
-            action = self.mlp(state) + noise
+            action = self.forward(state_tensor)
+        return action.cpu().numpy().flatten()
 
-        a = action.cpu().numpy()[0]
-        return np.clip(a, -self._max_action, self._max_action)
+    def explore(self, state: npt.NDArray) -> npt.NDArray:
+        state_tensor = t.tensor(state, device=self._device).unsqueeze_(0)
+        noise = (t.randn(self._action_shape) * self._expl_noise).to(self._device)
+        with t.no_grad():
+            action = self.mlp(state_tensor) + noise
+        action = action.cpu().numpy()[0]
+        return np.clip(action, -self._max_action, self._max_action)
 
 
 class GaussianActor(nn.Module):
-    def __init__(self, state_dim, action_dim, hidden_units, hidden_activation):
+    def __init__(
+            self,
+            state_dim: int,
+            action_dim: int,
+            hidden_units: tuple[int, ...],
+            hidden_activation: nn.Module,
+            device: str,
+        ):
         super().__init__()
         self.action_dim = action_dim
         self.net = MLP(
             state_dim, 2 * action_dim, hidden_units, hidden_activation=hidden_activation
         )
+        self.device = device
 
     def forward(self, obs: t.Tensor) -> tuple[t.Tensor, t.Tensor | None]:
         mean, log_std = self.net(obs).split([self.action_dim, self.action_dim], dim=1)
@@ -161,13 +181,21 @@ class GaussianActor(nn.Module):
             log_prob = None
         return action, log_prob
 
-    @property
-    def device(self):
-        return next(self.parameters()).device
+    def explore(self, state: npt.NDArray) -> npt.NDArray:
+        state_tensor = t.tensor(state, device=self.device).unsqueeze_(0)
+        with t.no_grad():
+            action, _ = self.forward(state_tensor)
+        return action.cpu().numpy()[0]
+
+    def exploit(self, state: npt.NDArray) -> npt.NDArray:
+        self.eval()
+        action = self.explore(state)
+        self.train()
+        return action
 
 
-class TanhNormal(Distribution):
-    def __init__(self, normal_mean: t.Tensor, normal_std: t.Tensor, device: str):
+class TanhNormal:
+    def __init__(self, normal_mean: t.Tensor, normal_std: t.Tensor, device: str) -> None:
         super().__init__()
         self.normal_mean = normal_mean
         self.normal_std = normal_std
@@ -179,8 +207,7 @@ class TanhNormal(Distribution):
 
     def log_prob(self, pre_tanh: t.Tensor) -> t.Tensor:
         log_det = 2 * np.log(2) + logsigmoid(2 * pre_tanh) + logsigmoid(-2 * pre_tanh)
-        result = self.normal.log_prob(pre_tanh) - log_det
-        return result
+        return self.normal.log_prob(pre_tanh) - log_det
 
     def rsample(self) -> tuple[t.Tensor, t.Tensor]:
         pretanh = self.normal_mean + self.normal_std * self.standard_normal.sample()
